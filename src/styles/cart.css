@@ -1,0 +1,225 @@
+/* Cart Panel */
+.cart-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.cart-panel h2 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.empty-cart {
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.cart-items {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--surface-1);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-details h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-price {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.item-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.qty-control {
+  width: 44px;
+  padding: 6px 4px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  text-align: center;
+  min-height: 32px;
+  font-weight: 500;
+}
+
+.qty-control:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+}
+
+.item-total {
+  min-width: 56px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.btn-remove {
+  padding: 6px 8px;
+  background-color: var(--bg-danger);
+  color: var(--text-danger);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  min-height: 32px;
+  font-weight: 600;
+}
+
+.btn-remove:hover {
+  background-color: var(--status-error);
+  color: white;
+  border-color: var(--status-error);
+}
+
+/* Cart Totals */
+.cart-totals {
+  background-color: var(--surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 5px 0;
+  color: var(--text-secondary);
+}
+
+.total-row.discount {
+  color: var(--status-warning);
+}
+
+.total-row.final {
+  font-weight: 700;
+  font-size: 16px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 8px;
+  margin-top: 6px;
+  color: var(--text-primary);
+}
+
+.amount {
+  text-align: right;
+}
+
+/* Discount UI */
+.discount-ui {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.discount-input,
+.discount-type {
+  padding: 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  min-height: 40px;
+}
+
+.discount-input:focus,
+.discount-type:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+}
+
+.btn-apply,
+.btn-discount,
+.btn-cancel {
+  padding: 10px;
+  font-size: 13px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 150ms ease;
+  min-height: 40px;
+}
+
+.btn-apply {
+  background-color: var(--accent-primary);
+  color: var(--on-primary);
+}
+
+.btn-apply:hover {
+  background-color: var(--accent-primary-dark);
+}
+
+.btn-discount {
+  background-color: var(--surface-1);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.btn-discount:hover {
+  background-color: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.btn-cancel {
+  background-color: var(--surface-1);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.btn-cancel:hover {
+  background-color: var(--surface-3);
+  border-color: var(--border-strong);
+}
