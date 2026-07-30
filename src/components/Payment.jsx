@@ -11,7 +11,7 @@ const formatKes = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-export default function PaymentUI() {
+export default function PaymentUI({ onSaleCompleted }) {
   const {
     items,
     total,
@@ -30,6 +30,7 @@ export default function PaymentUI() {
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const [showReceipt, setShowReceipt] = useState(false);
+  const [promoMessage, setPromoMessage] = useState("");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -109,6 +110,12 @@ export default function PaymentUI() {
             serverSaleId && serverSaleId !== saleLocalId
               ? await getSaleReceipt(serverSaleId)
               : "Receipt will print after sync.";
+          const promo = syncResult?.promoWins?.find((entry) => entry.saleId === serverSaleId);
+          if (promo?.wins?.length) {
+            setPromoMessage(`🎉 ${promo.wins.map((win) => win.type === "cashback"
+              ? `Cashback win: KES ${Number(win.cashback_amount).toFixed(2)}`
+              : `Prize win: ${win.reward?.name || "a reward"}`).join(" · ")}`);
+          }
           setReceipt(receiptText);
           setShowReceipt(true);
         } catch (syncErr) {
@@ -126,6 +133,8 @@ export default function PaymentUI() {
         resetCart();
         setShowReceipt(false);
         setReceipt("");
+        setPromoMessage("");
+        onSaleCompleted?.();
       }, 3000);
     } catch (err) {
       setError(err.message || "Failed to process payment");
@@ -175,6 +184,7 @@ export default function PaymentUI() {
           <pre className="text-textPrimary text-xs whitespace-pre-wrap font-mono">
             {receipt}
           </pre>
+          {promoMessage && <p className="p-3 rounded-xl bg-success/10 text-success text-sm font-semibold">{promoMessage}</p>}
           <button
             onClick={handlePrintReceipt}
             className="w-full py-2.5 rounded-xl bg-surface2 border border-borderColor text-textPrimary font-semibold hover:bg-surface3 transition-colors active:scale-[0.98]">

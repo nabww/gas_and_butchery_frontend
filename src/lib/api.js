@@ -1,3 +1,5 @@
+import { cacheCredential, verifyOfflinePin } from "./auth/credentialCache";
+
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV
@@ -7,13 +9,47 @@ const TOKEN_KEY = "tezipos-token";
 const STAFF_KEY = "tezipos-staff";
 
 export async function login(pin) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pin }),
-  });
+  const tryOfflineFallback = async () => {
+    const offline = await verifyOfflinePin(pin);
+    if (offline) {
+      localStorage.setItem(TOKEN_KEY, offline.token);
+      localStorage.setItem(STAFF_KEY, JSON.stringify(offline.staff));
+      return { staff: offline.staff, token: offline.token, offline: true };
+    }
+    return null;
+  };
 
-  const data = await res.json();
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+  } catch (networkErr) {
+    // Server unreachable — try offline credential cache
+    const offline = await tryOfflineFallback();
+    if (offline) return offline;
+    throw new Error(
+      "Cannot reach server and no cached credentials found for this PIN. " +
+      "Sign in online first to enable offline access."
+    );
+  }
+
+  let data = null;
+  let parseFailed = false;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    parseFailed = true;
+  }
+
+  if (parseFailed) {
+    // Backend down or proxy error page — try offline credential cache
+    const offline = await tryOfflineFallback();
+    if (offline) return offline;
+    throw new Error("Server returned an invalid response. Is the backend running?");
+  }
 
   if (!res.ok) {
     throw new Error(data.error || "Login failed");
@@ -21,6 +57,7 @@ export async function login(pin) {
 
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(STAFF_KEY, JSON.stringify(data.staff));
+  cacheCredential(pin, data.staff, data.token);
   return data;
 }
 
@@ -40,14 +77,19 @@ export function logout() {
 
 export async function apiFetch(path, options = {}) {
   const token = getToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (networkErr) {
+    throw new Error("Server unreachable — working offline");
+  }
 
   if (res.status === 401) {
     logout();
@@ -253,6 +295,76 @@ export async function getCustomerPoints(customerId) {
 
 export async function getLoyaltyConfig() {
   return apiFetch("/loyalty/config");
+}
+
+export async function updateLoyaltyConfig(config) {
+  return apiFetch("/loyalty/config", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  });
+}
+
+// ========== REWARDS & PROMOTIONS API ==========
+export async function getRewards(includeInactive = false) {
+  return apiFetch(`/rewards${includeInactive ? "?include_inactive=true" : ""}`);
+}
+export async function createReward(reward) {
+  return apiFetch("/rewards", { method: "POST", body: JSON.stringify(reward) });
+}
+export async function updateReward(rewardId, reward) {
+  return apiFetch(`/rewards/${rewardId}`, { method: "PUT", body: JSON.stringify(reward) });
+}
+export async function redeemReward(rewardId, customerId) {
+  return apiFetch(`/rewards/${rewardId}/redeem`, { method: "POST", body: JSON.stringify({ customer_id: customerId }) });
+}
+export async function getPromoRules(includeInactive = false) {
+  return apiFetch(`/promotions/rules${includeInactive ? "?include_inactive=true" : ""}`);
+}
+export async function createPromoRule(rule) {
+  return apiFetch("/promotions/rules", { method: "POST", body: JSON.stringify(rule) });
+}
+export async function updatePromoRule(ruleId, rule) {
+  return apiFetch(`/promotions/rules/${ruleId}`, { method: "PUT", body: JSON.stringify(rule) });
+}
+export async function getPromoPayouts(includePaid = false) {
+  return apiFetch(`/promotions/payouts${includePaid ? "?include_paid=true" : ""}`);
+}
+export async function markPromoPayoutPaid(payoutId) {
+  return apiFetch(`/promotions/payouts/${payoutId}/paid`, { method: "PUT" });
+}
+
+// ========== STOCK ADMIN API ==========
+
+export async function getCylinderStockAdmin() {
+  return apiFetch("/stock-admin/cylinders");
+}
+
+export async function getLowStockAlerts() {
+  return apiFetch("/stock-admin/cylinders/alerts");
+}
+
+export async function adjustCylinderStock(brandId, data) {
+  return apiFetch(`/stock-admin/cylinders/${brandId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateStockThreshold(brandId, threshold) {
+  return apiFetch(`/stock-admin/cylinders/${brandId}/threshold`, {
+    method: "PUT",
+    body: JSON.stringify({ threshold }),
+  });
+}
+
+export async function getOversellFlags(includeResolved = false) {
+  return apiFetch(`/stock-admin/oversells${includeResolved ? "?include_resolved=true" : ""}`);
+}
+
+export async function resolveOversellFlag(flagId) {
+  return apiFetch(`/stock-admin/oversells/${flagId}/resolve`, {
+    method: "PUT",
+  });
 }
 
 export async function redeemPoints(customerId, saleId, points) {

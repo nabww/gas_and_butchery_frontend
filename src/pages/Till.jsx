@@ -43,6 +43,7 @@ export default function Till({ staff }) {
   const [businessType, setBusinessType] = useState(allowedBusinesses[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [offlineSalesEnabled, setOfflineSalesEnabledState] = useState(
     isOfflineSalesEnabled,
   );
@@ -159,6 +160,7 @@ export default function Till({ staff }) {
               allowedBusinesses={allowedBusinesses}
               onSelectBusiness={setBusinessType}
               staffRole={staff?.role}
+              refreshSignal={catalogRefreshKey}
             />
           </div>
 
@@ -175,7 +177,9 @@ export default function Till({ staff }) {
             {items.length > 0 && (
               <>
                 <div className="right-section checkout-section">
-                  <Payment />
+                  <Payment
+                    onSaleCompleted={() => setCatalogRefreshKey((k) => k + 1)}
+                  />
                 </div>
 
                 <div className="till-actions">

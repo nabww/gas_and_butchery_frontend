@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   loadProducts as loadCachedProducts,
   refreshProductCache,
@@ -16,6 +16,7 @@ export default function ProductCatalog({
   allowedBusinesses = DEFAULT_BUSINESSES,
   onSelectBusiness,
   staffRole,
+  refreshSignal = 0,
 }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -23,10 +24,21 @@ export default function ProductCatalog({
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
   const [allBrands, setAllBrands] = useState([]);
+  const isFirstLoad = useRef(true);
 
   useEffect(() => {
     loadProducts();
   }, [businessType]);
+
+  // Reload stock quantities after a sale completes. Skip the first
+  // render — the businessType effect above already covers initial load.
+  useEffect(() => {
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    loadProducts();
+  }, [refreshSignal]);
 
   const handleRefresh = async () => {
     if (!navigator.onLine) {

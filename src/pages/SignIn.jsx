@@ -39,7 +39,6 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
       setSubmitting(false);
     }
   };
-
   return (
     <div
       style={{

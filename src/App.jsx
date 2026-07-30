@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import SignIn from "./pages/SignIn";
 import RoleNav from "./layouts/RoleNav";
 import Till from "./pages/Till";
+import GasStockAdmin from "./pages/GasStockAdmin";
+import LoyaltySettings from "./pages/LoyaltySettings";
+import RewardsAdmin from "./pages/RewardsAdmin";
+import PromotionsAdmin from "./pages/PromotionsAdmin";
 import { getStoredStaff, logout } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
@@ -84,6 +88,14 @@ export default function App() {
         />
         {currentPath === "/till" ? (
           <Till staff={staff} />
+        ) : currentPath === "/stock" ? (
+          <GasStockAdmin staffRole={staff.role} />
+        ) : currentPath === "/settings" ? (
+          <LoyaltySettings />
+        ) : currentPath === "/rewards" ? (
+          <RewardsAdmin />
+        ) : currentPath === "/promotions" ? (
+          <PromotionsAdmin />
         ) : (
           <Placeholder name={currentPath.replace("/", "") || "till"} />
         )}

@@ -5,7 +5,7 @@ import {
   applySaleDiscount,
 } from "../lib/saleOperations";
 import { useCart } from "../contexts/CartContext";
-import { getCustomerPoints, getLoyaltyConfig } from "../lib/api";
+import { getCustomerPoints, getLoyaltyConfig, getRewards, redeemReward } from "../lib/api";
 import { redeemLocalPoints } from "../lib/db/syncQueue";
 import QuantityStepper from "./QuantityStepper";
 
@@ -46,8 +46,8 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
   };
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl bg-surface1 border border-borderColor">
-      <div className="flex-1 min-w-0">
+    <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 p-3 rounded-xl bg-surface1 border border-borderColor">
+      <div className="flex-1 min-w-0 w-full">
         <p className="text-textPrimary font-semibold text-sm truncate">
           {item.product_name}
         </p>
@@ -56,7 +56,7 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
         </p>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center justify-between lg:justify-end gap-3 shrink-0 w-full lg:w-auto">
         <QuantityStepper
           value={item.quantity}
           onChange={handleQtyChange}
@@ -103,6 +103,10 @@ export default function Cart({ canRedeemPoints }) {
   const [redemptionRate, setRedemptionRate] = useState(5);
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [redeemError, setRedeemError] = useState("");
+  const [showRewardUI, setShowRewardUI] = useState(false);
+  const [rewards, setRewards] = useState([]);
+  const [rewardLoading, setRewardLoading] = useState(false);
+  const [rewardError, setRewardError] = useState("");
 
   useEffect(() => {
     if (canRedeemPoints && customer?.id && navigator.onLine) {
@@ -120,6 +124,10 @@ export default function Cart({ canRedeemPoints }) {
         .then((config) => setRedemptionRate(parseFloat(config.redemption_rate_kes)))
         .catch(() => {});
     }
+  }, [canRedeemPoints]);
+
+  useEffect(() => {
+    if (canRedeemPoints && navigator.onLine) getRewards().then(setRewards).catch(() => setRewards([]));
   }, [canRedeemPoints]);
 
   const handleRedeem = async () => {
@@ -181,6 +189,17 @@ export default function Cart({ canRedeemPoints }) {
     } catch (err) {
       alert(err.message || "Failed to apply discount");
     }
+  };
+
+  const handleRewardRedeem = async (reward) => {
+    setRewardLoading(true); setRewardError("");
+    try {
+      const result = await redeemReward(reward.id, customer.id);
+      setPointsBalance(result.balanceAfter);
+      setRewards((current) => current.map((item) => item.id === reward.id ? { ...item, stock_qty: item.stock_qty - 1 } : item));
+      setRewardError(`${reward.name} redeemed and handed to the customer.`);
+    } catch (err) { setRewardError(err.message || "Could not redeem reward."); }
+    finally { setRewardLoading(false); }
   };
 
   return (
@@ -316,6 +335,23 @@ export default function Cart({ canRedeemPoints }) {
                   className="w-full py-2.5 rounded-xl border border-borderColor bg-surface1 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors active:scale-[0.98]">
                   Redeem Points ({pointsBalance} pts)
                 </button>
+              )
+            )}
+
+            {canRedeemPoints && customer?.id && pointsBalance !== null && (
+              showRewardUI ? (
+                <div className="p-4 rounded-2xl bg-surface1 border border-borderColor space-y-2">
+                  <div className="flex justify-between text-xs text-textMuted"><span>Rewards catalogue</span><span>{pointsBalance} pts available</span></div>
+                  {rewards.filter((reward) => reward.stock_qty > 0).map((reward) => (
+                    <button key={reward.id} onClick={() => handleRewardRedeem(reward)} disabled={rewardLoading || pointsBalance < reward.points_cost} className="w-full text-left p-2 rounded-lg bg-surface2 border border-borderColor text-sm disabled:opacity-50">
+                      <span className="text-textPrimary font-semibold">{reward.name}</span><span className="text-textMuted"> — {reward.points_cost} pts · {reward.stock_qty} left</span>
+                    </button>
+                  ))}
+                  {rewardError && <p className={rewardError.includes("redeemed") ? "text-success text-xs" : "text-danger text-xs"}>{rewardError}</p>}
+                  <button onClick={() => { setShowRewardUI(false); setRewardError(""); }} className="w-full py-2 rounded-xl border border-borderColor text-textSecondary text-sm">Close</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowRewardUI(true)} className="w-full py-2.5 rounded-xl border border-borderColor bg-surface1 text-textSecondary text-sm font-semibold hover:bg-surface3">Redeem a Reward</button>
               )
             )}
           </div>

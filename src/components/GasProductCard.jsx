@@ -71,6 +71,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
           product_id: null,
           cylinder_brand_id: product.brand_id,
           product_name: itemName,
+          item_type: isModeRefill ? "refill" : "complete",
           quantity,
           unit_price: unitPriceForMode,
           line_total: lineTotal,
@@ -82,6 +83,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
           product_id: null,
           cylinder_brand_id: product.brand_id,
           product_name: itemName,
+          item_type: isModeRefill ? "refill" : "complete",
           quantity,
           unit_price: unitPriceForMode,
           line_total: lineTotal,
@@ -120,7 +122,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
       const issuedValue = parseFloat(issuedBrand.cylinder_value);
       const returnedValue = parseFloat(returnedBrand.cylinder_value);
       if (issuedValue > returnedValue) {
-        priceAdjustment = issuedValue - returnedValue;
+        priceAdjustment = (issuedValue - returnedValue) * quantity;
       }
     }
 
@@ -132,6 +134,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
         product_id: null,
         cylinder_brand_id: product.brand_id,
         product_name: itemName,
+        item_type: "refill",
         quantity,
         unit_price: product.refill_price,
         line_total: lineTotal,
@@ -143,6 +146,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
         product_id: null,
         cylinder_brand_id: product.brand_id,
         product_name: itemName,
+        item_type: "refill",
         quantity,
         unit_price: product.refill_price,
         line_total: lineTotal,
@@ -153,6 +157,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
       await recordLocalCylinderExchange(saleLocalId, {
         empty_brand_id: parseInt(returnBrandId),
         issued_brand_id: product.brand_id,
+        quantity,
         price_adjustment: priceAdjustment,
       });
 
