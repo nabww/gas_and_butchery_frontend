@@ -330,37 +330,59 @@ export default function GasStockAdmin({ staffRole }) {
                 </tr>
               </thead>
               <tbody>
-                {oversells.map((flag) => (
-                  <tr key={flag.id} className="border-b border-borderColor last:border-0">
-                    <td className="py-3 px-4">
-                      <p className="text-textPrimary font-semibold text-sm">
-                        {flag.item_name || `${flag.item_type} #${flag.cylinder_brand_id || flag.product_id}`}
-                      </p>
-                      <p className="text-textMuted text-xs">Sale #{flag.sale_id}</p>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="text-danger font-semibold text-sm">{flag.requested}</span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="text-textSecondary text-sm">{flag.available}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="text-textSecondary text-sm">
-                        {new Date(flag.sale_date).toLocaleString()}
-                      </span>
-                    </td>
-                    {isAdmin && (
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleResolveOversell(flag.id)}
-                          className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary"
-                        >
-                          Resolve
-                        </button>
+                {oversells.map((flag) => {
+                  const matchingStock = stock.find(
+                    (s) => s.cylinder_brand_id === flag.cylinder_brand_id,
+                  );
+                  // Only cylinder stock is tracked on this page; for
+                  // accessory oversells we can't verify client-side, so
+                  // leave the button enabled and let the backend enforce it.
+                  const stockAdjusted =
+                    flag.item_type !== "cylinder" ||
+                    (!!matchingStock?.updated_at &&
+                      new Date(matchingStock.updated_at) > new Date(flag.created_at));
+
+                  return (
+                    <tr key={flag.id} className="border-b border-borderColor last:border-0">
+                      <td className="py-3 px-4">
+                        <p className="text-textPrimary font-semibold text-sm">
+                          {flag.item_name || `${flag.item_type} #${flag.cylinder_brand_id || flag.product_id}`}
+                        </p>
+                        <p className="text-textMuted text-xs">Sale #{flag.sale_id}</p>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="py-3 px-4 text-center">
+                        <span className="text-danger font-semibold text-sm">{flag.requested}</span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="text-textSecondary text-sm">{flag.available}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-textSecondary text-sm">
+                          {new Date(flag.sale_date).toLocaleString()}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => handleResolveOversell(flag.id)}
+                            disabled={!stockAdjusted}
+                            title={
+                              stockAdjusted
+                                ? "Mark this oversell as reviewed"
+                                : "Edit the stock quantity above to reflect the actual on-hand count before resolving"
+                            }
+                            className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Resolve
+                          </button>
+                          {!stockAdjusted && (
+                            <p className="text-textMuted text-xs mt-1">Adjust stock first</p>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

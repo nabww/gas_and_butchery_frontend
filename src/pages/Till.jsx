@@ -32,7 +32,7 @@ function useOnlineStatus() {
 
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
 
-export default function Till({ staff }) {
+export default function Till({ staff, onNavigate }) {
   const isOnline = useOnlineStatus();
   const allowedBusinesses = useMemo(() => {
     const access = staff?.businessAccess || [];
@@ -44,6 +44,7 @@ export default function Till({ staff }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const [pendingConsentCustomer, setPendingConsentCustomer] = useState(null);
   const [offlineSalesEnabled, setOfflineSalesEnabledState] = useState(
     isOfflineSalesEnabled,
   );
@@ -125,6 +126,13 @@ export default function Till({ staff }) {
     setOfflineSalesEnabled(next);
   };
 
+  const handleRegisterPendingCustomer = () => {
+    if (!pendingConsentCustomer) return;
+    sessionStorage.setItem("tezipos-prefill-customer-phone", pendingConsentCustomer.phone);
+    setPendingConsentCustomer(null);
+    onNavigate?.("/customers");
+  };
+
   return (
     <div className="till-container">
       <div className="till-header">
@@ -179,6 +187,7 @@ export default function Till({ staff }) {
                 <div className="right-section checkout-section">
                   <Payment
                     onSaleCompleted={() => setCatalogRefreshKey((k) => k + 1)}
+                    onNewMpesaCustomer={setPendingConsentCustomer}
                   />
                 </div>
 
@@ -189,6 +198,31 @@ export default function Till({ staff }) {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {pendingConsentCustomer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface2 border border-borderColor rounded-2xl p-6 max-w-sm w-full space-y-4">
+            <h2 className="text-lg font-bold text-textPrimary">New M-Pesa customer</h2>
+            <p className="text-textSecondary text-sm">
+              <span className="font-semibold">{pendingConsentCustomer.phone}</span> paid via
+              M-Pesa but isn't registered — no consent is on file to retain their details, so
+              this record will be auto-purged in 3 months unless registered.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRegisterPendingCustomer}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-onPrimary font-semibold text-sm hover:bg-primaryDark transition-colors">
+                Register now
+              </button>
+              <button
+                onClick={() => setPendingConsentCustomer(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-borderColor bg-surface1 text-textSecondary font-semibold text-sm hover:bg-surface3 hover:text-textPrimary transition-colors">
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
       )}

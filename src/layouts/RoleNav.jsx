@@ -19,6 +19,7 @@ const NAV_BY_ROLE = {
     { label: 'Catalog', path: '/catalog' },
     { label: 'Rewards', path: '/rewards' },
     { label: 'Promos', path: '/promotions' },
+    { label: 'Corporate', path: '/corporate' },
     { label: 'Stock', path: '/stock' },
     { label: 'Settings', path: '/settings' },
   ],

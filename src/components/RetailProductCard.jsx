@@ -27,12 +27,17 @@ function getIcon(product) {
 }
 
 function RetailProductCard({ product, onToast }) {
-  const { saleId, saleLocalId, items, addItem, updateItem } = useCart();
+  const { saleId, saleLocalId, items, addItem, updateItem, corporatePricing } = useCart();
+  // Corporate clients get their own negotiated price per product, set by
+  // admin and editable at any time — falls back to standard pricing when
+  // no override exists (walk-in/individual customers, or no override set).
+  const unitPrice = corporatePricing[product.id] ?? product.unit_price;
+  const hasCustomPrice = corporatePricing[product.id] !== undefined;
   const isWeighted = product.pricing_type === "weighted";
   const initialQuantity = isWeighted ? 0.5 : 1;
   const [quantity, setQuantity] = useState(initialQuantity);
   const [amount, setAmount] = useState(
-    isWeighted ? (initialQuantity * product.unit_price).toFixed(2) : "",
+    isWeighted ? (initialQuantity * unitPrice).toFixed(2) : "",
   );
   const [isAdding, setIsAdding] = useState(false);
 
@@ -43,9 +48,9 @@ function RetailProductCard({ product, onToast }) {
 
   useEffect(() => {
     if (isWeighted) {
-      setAmount((quantity * product.unit_price).toFixed(2));
+      setAmount((quantity * unitPrice).toFixed(2));
     }
-  }, [quantity, product.unit_price, isWeighted]);
+  }, [quantity, unitPrice, isWeighted]);
 
   const handleAdd = async () => {
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -63,7 +68,7 @@ function RetailProductCard({ product, onToast }) {
         (i) =>
           i.product_id === product.id &&
           i.product_name === product.name &&
-          Number(i.unit_price) === Number(product.unit_price),
+          Number(i.unit_price) === Number(unitPrice),
       );
 
       if (matchingItem) {
@@ -73,20 +78,20 @@ function RetailProductCard({ product, onToast }) {
         await updateSaleItem(
           matchingItem.local_id || matchingItem.id,
           newQuantity,
-          product.unit_price,
+          unitPrice,
           saleId,
         );
         updateItem(matchingItem.id, newQuantity);
       } else {
         const lineTotal = parseFloat(
-          (quantity * product.unit_price).toFixed(2),
+          (quantity * unitPrice).toFixed(2),
         );
         const newItem = await addSaleItem(saleId, saleLocalId, {
           product_id: product.id,
           cylinder_brand_id: null,
           product_name: product.name,
           quantity,
-          unit_price: product.unit_price,
+          unit_price: unitPrice,
           line_total: lineTotal,
           pricing_type: product.pricing_type,
         });
@@ -97,7 +102,7 @@ function RetailProductCard({ product, onToast }) {
           cylinder_brand_id: null,
           product_name: product.name,
           quantity,
-          unit_price: product.unit_price,
+          unit_price: unitPrice,
           line_total: lineTotal,
           pricing_type: product.pricing_type,
           is_brand: false,
@@ -106,7 +111,7 @@ function RetailProductCard({ product, onToast }) {
       const resetQty = product.pricing_type === "weighted" ? 0.5 : 1;
       setQuantity(resetQty);
       if (isWeighted) {
-        setAmount((resetQty * product.unit_price).toFixed(2));
+        setAmount((resetQty * unitPrice).toFixed(2));
       }
     } catch (err) {
       onToast(err.message || "Failed to add item");
@@ -128,7 +133,12 @@ function RetailProductCard({ product, onToast }) {
           {product.name}
         </h3>
         <p className="text-textPrimary text-lg font-bold mt-1">
-          {formatKes(product.unit_price)}
+          {formatKes(unitPrice)}
+          {hasCustomPrice && (
+            <span className="ml-2 text-xs font-semibold text-primary align-middle">
+              corporate rate
+            </span>
+          )}
         </p>
         <p className="text-textMuted text-sm mt-0.5">
           {product.pricing_type === "weighted" ? "Per kg" : "Fixed"}
@@ -159,7 +169,7 @@ function RetailProductCard({ product, onToast }) {
               setAmount(value);
               const num = parseFloat(value);
               if (Number.isFinite(num) && num > 0) {
-                setQuantity(parseFloat((num / product.unit_price).toFixed(2)));
+                setQuantity(parseFloat((num / unitPrice).toFixed(2)));
               }
             }}
             className="w-28 px-2.5 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-right text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"

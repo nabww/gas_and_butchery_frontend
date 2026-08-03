@@ -99,15 +99,25 @@ export async function apiFetch(path, options = {}) {
   if (!contentType.includes("application/json")) {
     const text = await res.text().catch(() => "");
     console.error("Non-JSON response", res.status, text.slice(0, 200));
-    throw new Error(
-      res.ok
-        ? "Unexpected response from server. Is the backend running?"
-        : `Request failed (${res.status})`,
-    );
+    if (!res.ok) {
+      // Our API always returns JSON errors, so a non-JSON error body means
+      // the request never reached the backend (e.g. dev proxy error page
+      // when the server is down/unreachable) — treat this as an offline
+      // condition rather than surfacing a raw status code.
+      throw new Error(
+        "This feature needs an internet connection to the server. Please check your connection and try again.",
+      );
+    }
+    throw new Error("Unexpected response from server. Is the backend running?");
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) {
+    const err = new Error(data.error || "Request failed");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 
@@ -228,28 +238,125 @@ export async function initiateM2pesa(phone, amount) {
   });
 }
 
-export async function linkM2pesaToSale(
-  mpesaTransactionId,
-  saleId,
-  resultCode = "0",
-) {
+/**
+ * Poll for the result of a pending STK push. Returns { pending: true }
+ * while still awaiting the customer, or { pending: false, resultCode,
+ * resultDesc } once resolved ("0" = success per Daraja docs).
+ */
+export async function getM2pesaStatus(mpesaTransactionId) {
+  return apiFetch(`/payments/mpesa/status/${mpesaTransactionId}`);
+}
+
+export async function linkM2pesaToSale(mpesaTransactionId, saleId) {
   return apiFetch("/payments/mpesa/link", {
     method: "POST",
     body: JSON.stringify({
       mpesa_transaction_id: mpesaTransactionId,
       sale_id: saleId,
-      result_code: resultCode,
     }),
   });
 }
 
-export async function processAccountPayment(corporateAccountId, amount) {
+/**
+ * Complete a sale by charging it to a corporate account. If the sale would
+ * exceed the account's credit limit, the backend responds 402 with
+ * { requiresApproval: true, creditCheck } (surfaced on err.data) — call
+ * verifyApprovalPin() to get a supervisor/admin staff id, then retry with
+ * creditOverrideStaffId set.
+ */
+export async function completeAccountSale(saleId, corporateAccountId, creditOverrideStaffId = null) {
   return apiFetch("/payments/account", {
     method: "POST",
     body: JSON.stringify({
+      sale_id: saleId,
       corporate_account_id: corporateAccountId,
-      amount: parseFloat(amount),
+      credit_override_staff_id: creditOverrideStaffId,
     }),
+  });
+}
+
+/**
+ * Confirm a PIN belongs to an active supervisor/admin, without switching
+ * the logged-in cashier's session. Used for in-flow approvals (e.g.
+ * credit-limit overrides). Returns { staff: { id, name, role } }.
+ */
+export async function verifyApprovalPin(pin) {
+  return apiFetch("/auth/verify-approval", {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
+// ========== CORPORATE ACCOUNTS API ==========
+
+export async function listCorporateAccounts() {
+  return apiFetch("/corporate/accounts");
+}
+
+export async function getCorporateAccount(corporateAccountId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}`);
+}
+
+export async function createCorporateAccount(customerId, creditLimit) {
+  return apiFetch("/corporate/accounts", {
+    method: "POST",
+    body: JSON.stringify({ customer_id: customerId, credit_limit: parseFloat(creditLimit) }),
+  });
+}
+
+export async function updateCorporateCreditLimit(corporateAccountId, creditLimit) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-limit`, {
+    method: "PATCH",
+    body: JSON.stringify({ credit_limit: parseFloat(creditLimit) }),
+  });
+}
+
+export async function checkCorporateCreditLimit(corporateAccountId, saleTotal) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-check`, {
+    method: "POST",
+    body: JSON.stringify({ sale_total: parseFloat(saleTotal) }),
+  });
+}
+
+export async function getCorporatePricing(corporateAccountId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/pricing`);
+}
+
+export async function setCorporatePricing(corporateAccountId, productId, customPrice) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/pricing`, {
+    method: "PUT",
+    body: JSON.stringify({ product_id: productId, custom_price: parseFloat(customPrice) }),
+  });
+}
+
+export async function removeCorporatePricing(corporateAccountId, productId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/pricing/${productId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function listCorporateInvoices(corporateAccountId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices`);
+}
+
+export async function generateTransactionInvoice(corporateAccountId, saleId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices/transaction`, {
+    method: "POST",
+    body: JSON.stringify({ sale_id: saleId }),
+  });
+}
+
+export async function generateConsolidatedInvoice(corporateAccountId, coversUpTo) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices/consolidated`, {
+    method: "POST",
+    body: JSON.stringify({ covers_up_to: coversUpTo }),
+  });
+}
+
+export async function recordInvoicePayment(invoiceId, amount, method = "cash") {
+  return apiFetch(`/corporate/invoices/${invoiceId}/payments`, {
+    method: "POST",
+    body: JSON.stringify({ amount: parseFloat(amount), method }),
   });
 }
 
@@ -280,11 +387,34 @@ export async function getCustomerByPhone(phone) {
   return apiFetch(`/customers/phone/${phone}`);
 }
 
-export async function createCustomer(phone, name = "") {
+export async function createCustomer(phone, name = "", { consentGiven, smsOptIn = true } = {}) {
   return apiFetch("/customers", {
     method: "POST",
-    body: JSON.stringify({ phone, name }),
+    body: JSON.stringify({ phone, name, consent_given: consentGiven, sms_opt_in: smsOptIn }),
   });
+}
+
+export async function updateCustomer(customerId, updates) {
+  return apiFetch(`/customers/${customerId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Grant/revoke a customer's data-retention consent and/or toggle their
+ * promotional SMS opt-in. Granting consent on a voided record reactivates
+ * it (see backend customers.service.js).
+ */
+export async function updateCustomerConsent(customerId, { consentGiven, smsOptIn } = {}) {
+  return apiFetch(`/customers/${customerId}/consent`, {
+    method: "PATCH",
+    body: JSON.stringify({ consent_given: consentGiven, sms_opt_in: smsOptIn }),
+  });
+}
+
+export async function runDpaRetentionCycle() {
+  return apiFetch("/customers/dpa/run-retention-cycle", { method: "POST" });
 }
 
 // ========== LOYALTY API ==========

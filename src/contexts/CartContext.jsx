@@ -7,6 +7,9 @@ export function CartProvider({ children }) {
   const [saleLocalId, setSaleLocalId] = useState(null);
   const [items, setItems] = useState([]);
   const [customer, setCustomer] = useState(null);
+  // Maps product_id -> custom_price for the selected corporate customer.
+  // Empty for walk-in/individual customers, so standard pricing applies.
+  const [corporatePricing, setCorporatePricing] = useState({});
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [subtotal, setSubtotal] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -54,6 +57,7 @@ export function CartProvider({ children }) {
     setSaleLocalId(null);
     setItems([]);
     setCustomer(null);
+    setCorporatePricing({});
     setPaymentMethod("cash");
     setSubtotal(0);
     setDiscountAmount(0);
@@ -71,6 +75,8 @@ export function CartProvider({ children }) {
         setItems,
         customer,
         setCustomer,
+        corporatePricing,
+        setCorporatePricing,
         paymentMethod,
         setPaymentMethod,
         subtotal,

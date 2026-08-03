@@ -101,6 +101,7 @@ export default function Cart({ canRedeemPoints }) {
   const [redeemInput, setRedeemInput] = useState("");
   const [pointsBalance, setPointsBalance] = useState(null);
   const [redemptionRate, setRedemptionRate] = useState(5);
+  const [maxRedemptionPercent, setMaxRedemptionPercent] = useState(50);
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [redeemError, setRedeemError] = useState("");
   const [showRewardUI, setShowRewardUI] = useState(false);
@@ -121,7 +122,10 @@ export default function Cart({ canRedeemPoints }) {
   useEffect(() => {
     if (canRedeemPoints && navigator.onLine) {
       getLoyaltyConfig()
-        .then((config) => setRedemptionRate(parseFloat(config.redemption_rate_kes)))
+        .then((config) => {
+          setRedemptionRate(parseFloat(config.redemption_rate_kes));
+          setMaxRedemptionPercent(parseFloat(config.max_redemption_percent ?? 50));
+        })
         .catch(() => {});
     }
   }, [canRedeemPoints]);
@@ -129,6 +133,8 @@ export default function Cart({ canRedeemPoints }) {
   useEffect(() => {
     if (canRedeemPoints && navigator.onLine) getRewards().then(setRewards).catch(() => setRewards([]));
   }, [canRedeemPoints]);
+
+  const maxRedeemableKes = parseFloat(((total * maxRedemptionPercent) / 100).toFixed(2));
 
   const handleRedeem = async () => {
     const points = parseInt(redeemInput);
@@ -141,8 +147,10 @@ export default function Cart({ canRedeemPoints }) {
       return;
     }
     const kesValue = (points * redemptionRate).toFixed(2);
-    if (parseFloat(kesValue) > total) {
-      setRedeemError(`Redemption value KES ${kesValue} exceeds total KES ${total.toFixed(2)}`);
+    if (parseFloat(kesValue) > maxRedeemableKes) {
+      setRedeemError(
+        `Redemption value KES ${kesValue} exceeds the ${maxRedemptionPercent}% cap (max KES ${maxRedeemableKes.toFixed(2)}) for this sale`,
+      );
       return;
     }
 
@@ -298,6 +306,9 @@ export default function Cart({ canRedeemPoints }) {
                     <span>Available: {pointsBalance} pts</span>
                     <span>Rate: 1 pt = KES {redemptionRate}</span>
                   </div>
+                  <p className="text-textMuted text-xs">
+                    Max redeemable on this sale: KES {maxRedeemableKes.toFixed(2)} ({maxRedemptionPercent}% cap)
+                  </p>
                   <input
                     type="number"
                     min="1"

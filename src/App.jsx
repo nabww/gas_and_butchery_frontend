@@ -6,6 +6,8 @@ import GasStockAdmin from "./pages/GasStockAdmin";
 import LoyaltySettings from "./pages/LoyaltySettings";
 import RewardsAdmin from "./pages/RewardsAdmin";
 import PromotionsAdmin from "./pages/PromotionsAdmin";
+import CorporateAccountsAdmin from "./pages/CorporateAccountsAdmin";
+import CustomersAdmin from "./pages/CustomersAdmin";
 import { getStoredStaff, logout } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
@@ -87,7 +89,9 @@ export default function App() {
           onSignOut={handleSignOut}
         />
         {currentPath === "/till" ? (
-          <Till staff={staff} />
+          <Till staff={staff} onNavigate={setPath} />
+        ) : currentPath === "/customers" ? (
+          <CustomersAdmin staffRole={staff.role} />
         ) : currentPath === "/stock" ? (
           <GasStockAdmin staffRole={staff.role} />
         ) : currentPath === "/settings" ? (
@@ -96,6 +100,8 @@ export default function App() {
           <RewardsAdmin />
         ) : currentPath === "/promotions" ? (
           <PromotionsAdmin />
+        ) : currentPath === "/corporate" ? (
+          <CorporateAccountsAdmin />
         ) : (
           <Placeholder name={currentPath.replace("/", "") || "till"} />
         )}

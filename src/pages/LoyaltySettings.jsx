@@ -11,6 +11,7 @@ export default function LoyaltySettings() {
   const [earnRate, setEarnRate] = useState("");
   const [redemptionRate, setRedemptionRate] = useState("");
   const [cashbackMax, setCashbackMax] = useState("");
+  const [maxRedemptionPercent, setMaxRedemptionPercent] = useState("");
   const [savedConfig, setSavedConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,6 +23,7 @@ export default function LoyaltySettings() {
         setEarnRate(String(config.earn_rate_per_100));
         setRedemptionRate(String(config.redemption_rate_kes));
         setCashbackMax(String(config.cashback_max_kes || 0));
+        setMaxRedemptionPercent(String(config.max_redemption_percent ?? 50));
         setSavedConfig(config);
       })
       .catch((err) => setMessage(err.message || "Failed to load loyalty settings."))
@@ -31,18 +33,25 @@ export default function LoyaltySettings() {
   const parsedEarnRate = Number(earnRate);
   const parsedRedemptionRate = Number(redemptionRate);
   const parsedCashbackMax = Number(cashbackMax);
+  const parsedMaxRedemptionPercent = Number(maxRedemptionPercent);
   const isValid =
     earnRate !== "" && redemptionRate !== "" &&
     Number.isFinite(parsedEarnRate) && parsedEarnRate >= 0 &&
     Number.isFinite(parsedRedemptionRate) && parsedRedemptionRate > 0;
   const cashbackValid = Number.isFinite(parsedCashbackMax) && parsedCashbackMax >= 0 && parsedCashbackMax % 50 === 0;
+  const maxRedemptionPercentValid =
+    maxRedemptionPercent !== "" &&
+    Number.isFinite(parsedMaxRedemptionPercent) &&
+    parsedMaxRedemptionPercent > 0 &&
+    parsedMaxRedemptionPercent <= 100;
 
   const saveIfChanged = async () => {
-    if (!isValid || !cashbackValid || !savedConfig) return;
+    if (!isValid || !cashbackValid || !maxRedemptionPercentValid || !savedConfig) return;
     if (
       parsedEarnRate === Number(savedConfig.earn_rate_per_100) &&
-      parsedRedemptionRate === Number(savedConfig.redemption_rate_kes)
-      && parsedCashbackMax === Number(savedConfig.cashback_max_kes || 0)
+      parsedRedemptionRate === Number(savedConfig.redemption_rate_kes) &&
+      parsedCashbackMax === Number(savedConfig.cashback_max_kes || 0) &&
+      parsedMaxRedemptionPercent === Number(savedConfig.max_redemption_percent ?? 50)
     ) return;
 
     setSaving(true);
@@ -52,11 +61,13 @@ export default function LoyaltySettings() {
         earn_rate_per_100: parsedEarnRate,
         redemption_rate_kes: parsedRedemptionRate,
         cashback_max_kes: parsedCashbackMax,
+        max_redemption_percent: parsedMaxRedemptionPercent,
       });
       setSavedConfig(updated);
       setEarnRate(String(updated.earn_rate_per_100));
       setRedemptionRate(String(updated.redemption_rate_kes));
       setCashbackMax(String(updated.cashback_max_kes || 0));
+      setMaxRedemptionPercent(String(updated.max_redemption_percent ?? 50));
       setMessage("Loyalty settings saved.");
     } catch (err) {
       setMessage(err.message || "Failed to save loyalty settings.");
@@ -133,6 +144,31 @@ export default function LoyaltySettings() {
           <label htmlFor="cashback-max" className="text-textPrimary font-semibold text-sm">Maximum cashback payout (KES)</label>
           <input id="cashback-max" className={inputClass} type="number" min="0" step="50" value={cashbackMax} onChange={(event) => setCashbackMax(event.target.value)} onBlur={saveIfChanged} disabled={saving} />
           <p className="text-textMuted text-sm mt-2">Cashback wins are randomized in KES 50 steps from KES 50 to this maximum. Set to 0 to disable cashback wins.</p>
+        </div>
+
+        <div className="border-t border-borderColor pt-5">
+          <label htmlFor="max-redemption-percent" className="text-textPrimary font-semibold text-sm">
+            Maximum % of sale coverable by points
+          </label>
+          <input
+            id="max-redemption-percent"
+            className={inputClass}
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            value={maxRedemptionPercent}
+            onChange={(event) => setMaxRedemptionPercent(event.target.value)}
+            onBlur={saveIfChanged}
+            disabled={saving}
+          />
+          <p className="text-textMuted text-sm mt-2">
+            On a {formatKes(1000)} sale, customers can redeem points for up to{" "}
+            <span className="text-primary font-semibold">
+              {formatKes(maxRedemptionPercentValid ? (1000 * parsedMaxRedemptionPercent) / 100 : 0)}
+            </span>{" "}
+            of the total.
+          </p>
         </div>
       </section>
     </main>

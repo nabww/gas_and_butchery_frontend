@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { createCustomer, getCustomerPoints } from "../lib/api";
+import { createCustomer, getCustomerPoints, getCorporatePricing } from "../lib/api";
 import {
   searchCustomersWithFallback,
   addCustomerToCache,
@@ -10,13 +10,15 @@ import { useCart } from "../contexts/CartContext";
 const WALKIN_CUSTOMER = { id: null, name: "Walk-in Customer", phone: "" };
 
 export default function CustomerSelector() {
-  const { saleId, saleLocalId, customer, setCustomer } = useCart();
+  const { saleId, saleLocalId, customer, setCustomer, setCorporatePricing } = useCart();
   const [searchInput, setSearchInput] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [newName, setNewName] = useState("");
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(true);
   const [error, setError] = useState("");
   const [pointsBalance, setPointsBalance] = useState(null);
 
@@ -52,6 +54,23 @@ export default function CustomerSelector() {
     }
   }, [searchInput]);
 
+  const loadCorporatePricing = async (cust) => {
+    if (!cust?.corporate_account_id) {
+      setCorporatePricing({});
+      return;
+    }
+    try {
+      const pricing = await getCorporatePricing(cust.corporate_account_id);
+      const map = {};
+      pricing.forEach((p) => {
+        map[p.product_id] = parseFloat(p.custom_price);
+      });
+      setCorporatePricing(map);
+    } catch {
+      setCorporatePricing({});
+    }
+  };
+
   const handleSelectCustomer = async (cust) => {
     if (saleLocalId) {
       try {
@@ -62,6 +81,7 @@ export default function CustomerSelector() {
       }
     }
     setCustomer(cust);
+    await loadCorporatePricing(cust);
     setSearchInput("");
     setSearchResults([]);
   };
@@ -76,6 +96,7 @@ export default function CustomerSelector() {
       }
     }
     setCustomer(WALKIN_CUSTOMER);
+    setCorporatePricing({});
     setSearchInput("");
     setSearchResults([]);
   };
@@ -90,11 +111,16 @@ export default function CustomerSelector() {
       }
     }
     setCustomer(null);
+    setCorporatePricing({});
   };
 
   const handleCreateCustomer = async () => {
     if (!newPhone) {
       setError("Phone number is required");
+      return;
+    }
+    if (!consentGiven) {
+      setError("The customer must consent to their data being retained before registering");
       return;
     }
 
@@ -103,7 +129,7 @@ export default function CustomerSelector() {
     try {
       let newCust;
       if (navigator.onLine) {
-        newCust = await createCustomer(newPhone, newName);
+        newCust = await createCustomer(newPhone, newName, { consentGiven, smsOptIn });
       } else {
         newCust = {
           id: null,
@@ -120,6 +146,8 @@ export default function CustomerSelector() {
       setCustomer(newCust);
       setNewPhone("");
       setNewName("");
+      setConsentGiven(false);
+      setSmsOptIn(true);
       setShowCreateForm(false);
       setSearchInput("");
     } catch (err) {
@@ -241,10 +269,30 @@ export default function CustomerSelector() {
             placeholder="Name (optional)"
             className="w-full px-3 py-2.5 rounded-xl bg-surface2 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm"
           />
+          <label className="flex items-start gap-2 text-xs text-textSecondary">
+            <input
+              type="checkbox"
+              checked={consentGiven}
+              onChange={(e) => setConsentGiven(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-primary shrink-0"
+            />
+            <span>
+              Customer consents to their phone number/name being retained for loyalty and receipts (required).
+            </span>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-textSecondary">
+            <input
+              type="checkbox"
+              checked={smsOptIn}
+              onChange={(e) => setSmsOptIn(e.target.checked)}
+              className="w-4 h-4 accent-primary shrink-0"
+            />
+            <span>Opt in to promotional SMS (points/receipts always send regardless)</span>
+          </label>
           <div className="flex gap-2">
             <button
               onClick={handleCreateCustomer}
-              disabled={loading}
+              disabled={loading || !consentGiven}
               className="flex-1 py-2 rounded-xl bg-primary text-onPrimary text-sm font-semibold hover:bg-primaryDark transition-colors disabled:opacity-50 active:scale-[0.98]">
               {loading ? "Creating..." : "Create"}
             </button>
@@ -253,6 +301,8 @@ export default function CustomerSelector() {
                 setShowCreateForm(false);
                 setNewPhone("");
                 setNewName("");
+                setConsentGiven(false);
+                setSmsOptIn(true);
               }}
               className="flex-1 py-2 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors active:scale-[0.98]">
               Cancel
