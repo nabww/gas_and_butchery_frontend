@@ -289,6 +289,34 @@ export async function verifyApprovalPin(pin) {
 
 // ========== CORPORATE ACCOUNTS API ==========
 
+export async function listLocations() {
+  return apiFetch("/staff/locations");
+}
+
+export async function listStaff() {
+  return apiFetch("/staff");
+}
+
+export async function createStaff(payload) {
+  return apiFetch("/staff", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateStaff(staffId, payload) {
+  return apiFetch(`/staff/${staffId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deactivateStaff(staffId) {
+  return apiFetch(`/staff/${staffId}/deactivate`, {
+    method: "PATCH",
+  });
+}
+
 export async function listCorporateAccounts() {
   return apiFetch("/corporate/accounts");
 }
@@ -362,15 +390,44 @@ export async function recordInvoicePayment(invoiceId, amount, method = "cash") {
 
 // ========== PRODUCTS API ==========
 
-export async function getProducts(businessType = null) {
-  const path = businessType
-    ? `/products?business_type=${businessType}`
-    : "/products";
-  return apiFetch(path);
+export async function getProducts(businessType = null, includeInactive = false) {
+  const params = new URLSearchParams();
+  if (businessType) params.set("business_type", businessType);
+  if (includeInactive) params.set("include_inactive", "true");
+  const query = params.toString();
+  return apiFetch(`/products${query ? `?${query}` : ""}`);
+}
+
+export async function createProduct(product) {
+  return apiFetch("/products", {
+    method: "POST",
+    body: JSON.stringify(product),
+  });
+}
+
+export async function updateProduct(productId, product) {
+  return apiFetch(`/products/${productId}`, {
+    method: "PATCH",
+    body: JSON.stringify(product),
+  });
 }
 
 export async function getCylinderBrands() {
   return apiFetch("/products/cylinder-brands");
+}
+
+export async function createCylinderBrand(brandData) {
+  return apiFetch("/stock-admin/cylinders", {
+    method: "POST",
+    body: JSON.stringify(brandData),
+  });
+}
+
+export async function updateCylinderBrand(brandId, brandData) {
+  return apiFetch(`/stock-admin/cylinders/${brandId}`, {
+    method: "PUT",
+    body: JSON.stringify(brandData),
+  });
 }
 
 // ========== CUSTOMERS API ==========

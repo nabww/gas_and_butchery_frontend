@@ -5,9 +5,247 @@ import {
   updateStockThreshold,
   getOversellFlags,
   resolveOversellFlag,
+  createCylinderBrand,
+  updateCylinderBrand,
 } from "../lib/api";
 
-function StockRow({ item, isAdmin, onToast, onUpdated }) {
+const inputClass =
+  "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
+
+function CylinderBrandForm({ editing, onSaved, onCancel }) {
+  const defaults = editing || {
+    brand: "",
+    weight_kg: "",
+    refill_price: "",
+    cylinder_value: "",
+    filled_qty: "0",
+    empty_qty: "0",
+    low_stock_threshold: "3",
+    is_active: true,
+  };
+
+  const [brand, setBrand] = useState(defaults.brand || "");
+  const [weightKg, setWeightKg] = useState(defaults.weight_kg ?? "");
+  const [refillPrice, setRefillPrice] = useState(defaults.refill_price ?? "");
+  const [cylinderValue, setCylinderValue] = useState(
+    defaults.cylinder_value ?? "",
+  );
+  const [filledQty, setFilledQty] = useState(defaults.filled_qty ?? "0");
+  const [emptyQty, setEmptyQty] = useState(defaults.empty_qty ?? "0");
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    defaults.low_stock_threshold ?? "3",
+  );
+  const [isActive, setIsActive] = useState(defaults.is_active !== false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (editing) {
+      setBrand(editing.brand || "");
+      setWeightKg(editing.weight_kg ?? "");
+      setRefillPrice(editing.refill_price ?? "");
+      setCylinderValue(editing.cylinder_value ?? "");
+      setFilledQty(editing.filled_qty ?? "0");
+      setEmptyQty(editing.empty_qty ?? "0");
+      setLowStockThreshold(editing.low_stock_threshold ?? "3");
+      setIsActive(editing.is_active !== false);
+    }
+  }, [editing]);
+
+  const submit = async () => {
+    if (!brand.trim()) {
+      setError("Brand name is required");
+      return;
+    }
+
+    const weight = Number(weightKg);
+    const refill = Number(refillPrice);
+    const cylinder = Number(cylinderValue);
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setError("Weight must be a positive number");
+      return;
+    }
+    if (!Number.isFinite(refill) || refill < 0) {
+      setError("Refill price must be valid");
+      return;
+    }
+    if (!Number.isFinite(cylinder) || cylinder < 0) {
+      setError("Cylinder value must be valid");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      const payload = {
+        brand: brand.trim(),
+        weight_kg: weight,
+        refill_price: refill,
+        cylinder_value: cylinder,
+        low_stock_threshold: Number(lowStockThreshold || 0),
+        filled_qty: Number(filledQty || 0),
+        empty_qty: Number(emptyQty || 0),
+        is_active: isActive,
+      };
+
+      if (editing) {
+        await updateCylinderBrand(editing.cylinder_brand_id, payload);
+      } else {
+        await createCylinderBrand(payload);
+      }
+
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Failed to save cylinder brand");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-textPrimary text-sm font-semibold">
+          {editing ? "Edit cylinder brand" : "Add cylinder brand"}
+        </p>
+        {editing && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs text-textMuted hover:text-textPrimary">
+            Cancel
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-textMuted text-xs block mb-1">Brand</label>
+          <input
+            className={inputClass}
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Weight (kg)
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="0.1"
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Refill price
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="0.01"
+            value={refillPrice}
+            onChange={(e) => setRefillPrice(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Cylinder value
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="0.01"
+            value={cylinderValue}
+            onChange={(e) => setCylinderValue(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Filled stock
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            value={filledQty}
+            onChange={(e) => setFilledQty(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Empty stock
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            value={emptyQty}
+            onChange={(e) => setEmptyQty(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-textMuted text-xs block mb-1">
+            Low-stock threshold
+          </label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            value={lowStockThreshold}
+            onChange={(e) => setLowStockThreshold(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center pt-6">
+          <label className="flex items-center gap-2 text-xs text-textSecondary">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            Active
+          </label>
+        </div>
+      </div>
+
+      {error && <p className="text-danger text-xs font-semibold">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+          {saving
+            ? editing
+              ? "Updating..."
+              : "Creating..."
+            : editing
+              ? "Update cylinder"
+              : "Create cylinder"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StockRow({
+  item,
+  isAdmin,
+  onToast,
+  onUpdated,
+  onEdit,
+  isExpanded,
+  onCancelEdit,
+}) {
   const [editing, setEditing] = useState(false);
   const [filledQty, setFilledQty] = useState(item.filled_qty);
   const [emptyQty, setEmptyQty] = useState(item.empty_qty);
@@ -49,112 +287,136 @@ function StockRow({ item, isAdmin, onToast, onUpdated }) {
     setEditing(false);
   };
 
-  const stockVariant = item.filled_qty <= 0
-    ? "danger"
-    : item.is_low_stock
-      ? "warning"
-      : "success";
+  const stockVariant =
+    item.filled_qty <= 0 ? "danger" : item.is_low_stock ? "warning" : "success";
 
   return (
-    <tr className="border-b border-borderColor last:border-0">
-      <td className="py-3 px-4">
-        <p className="text-textPrimary font-semibold text-sm">
-          {item.brand} {item.weight_kg}kg
-        </p>
-        {!item.is_active && (
-          <span className="text-xs text-danger">Inactive</span>
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min="0"
-            value={filledQty}
-            onChange={(e) => setFilledQty(e.target.value)}
-            className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
-          />
-        ) : (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-            stockVariant === "danger"
-              ? "bg-danger/10 text-danger"
-              : stockVariant === "warning"
-                ? "bg-warning/10 text-warning"
-                : "bg-success/10 text-success"
-          }`}>
-            {item.filled_qty}
-          </span>
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min="0"
-            value={emptyQty}
-            onChange={(e) => setEmptyQty(e.target.value)}
-            className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
-          />
-        ) : (
-          <span className="text-textSecondary text-sm">{item.empty_qty}</span>
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min="0"
-            value={threshold}
-            onChange={(e) => setThreshold(e.target.value)}
-            className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
-          />
-        ) : (
-          <span className="text-textMuted text-sm">{item.low_stock_threshold}</span>
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {item.is_low_stock && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-warning/10 text-warning">
-            Low
-          </span>
-        )}
-      </td>
-      {isAdmin && (
-        <td className="py-3 px-4 text-right">
-          {editing ? (
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-3 py-1 rounded-lg bg-primary text-onPrimary text-xs font-semibold hover:bg-primaryDark disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={saving}
-                className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary"
-            >
-              Edit
-            </button>
+    <>
+      <tr className="border-b border-borderColor last:border-0">
+        <td className="py-3 px-4">
+          <p className="text-textPrimary font-semibold text-sm">
+            {item.brand} {item.weight_kg}kg
+          </p>
+          {!item.is_active && (
+            <span className="text-xs text-danger">Inactive</span>
           )}
         </td>
+        <td className="py-3 px-4 text-center">
+          {editing ? (
+            <input
+              type="number"
+              min="0"
+              value={filledQty}
+              onChange={(e) => setFilledQty(e.target.value)}
+              className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
+            />
+          ) : (
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                stockVariant === "danger"
+                  ? "bg-danger/10 text-danger"
+                  : stockVariant === "warning"
+                    ? "bg-warning/10 text-warning"
+                    : "bg-success/10 text-success"
+              }`}>
+              {item.filled_qty}
+            </span>
+          )}
+        </td>
+        <td className="py-3 px-4 text-center">
+          {editing ? (
+            <input
+              type="number"
+              min="0"
+              value={emptyQty}
+              onChange={(e) => setEmptyQty(e.target.value)}
+              className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
+            />
+          ) : (
+            <span className="text-textSecondary text-sm">{item.empty_qty}</span>
+          )}
+        </td>
+        <td className="py-3 px-4 text-center">
+          {editing ? (
+            <input
+              type="number"
+              min="0"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
+              className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
+            />
+          ) : (
+            <span className="text-textMuted text-sm">
+              {item.low_stock_threshold}
+            </span>
+          )}
+        </td>
+        <td className="py-3 px-4 text-center">
+          {item.is_low_stock && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-warning/10 text-warning">
+              Low
+            </span>
+          )}
+        </td>
+        {isAdmin && (
+          <td className="py-3 px-4 text-right">
+            {editing ? (
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-3 py-1 rounded-lg bg-primary text-onPrimary text-xs font-semibold hover:bg-primaryDark disabled:opacity-50">
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => onEdit(item)}
+                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                  Edit
+                </button>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                  Adjust stock
+                </button>
+              </div>
+            )}
+          </td>
+        )}
+      </tr>
+
+      {isExpanded && (
+        <tr>
+          <td colSpan={isAdmin ? 6 : 5} className="px-4 pb-4">
+            <CylinderBrandForm
+              editing={item}
+              onSaved={() => {
+                onCancelEdit();
+                onUpdated();
+              }}
+              onCancel={onCancelEdit}
+            />
+          </td>
+        </tr>
       )}
-    </tr>
+    </>
   );
 }
 
 export default function GasStockAdmin({ staffRole }) {
   const [stock, setStock] = useState([]);
   const [oversells, setOversells] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -198,6 +460,22 @@ export default function GasStockAdmin({ staffRole }) {
 
   const lowStockItems = stock.filter((s) => s.is_low_stock);
 
+  const openCreate = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setExpandedId(item.cylinder_brand_id);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setExpandedId(null);
+    setEditing(null);
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -210,8 +488,7 @@ export default function GasStockAdmin({ staffRole }) {
         <button
           onClick={loadStock}
           disabled={loading}
-          className="px-4 py-2 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors disabled:opacity-50"
-        >
+          className="px-4 py-2 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors disabled:opacity-50">
           {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
@@ -220,6 +497,34 @@ export default function GasStockAdmin({ staffRole }) {
         <div className="mb-4 p-3 rounded-xl bg-success/10 border border-success/20 text-success text-sm font-medium">
           {toast}
         </div>
+      )}
+
+      {isAdmin && !showForm && (
+        <button
+          type="button"
+          onClick={openCreate}
+          className="mb-4 px-4 py-2 rounded-lg bg-primary text-onPrimary font-semibold text-sm">
+          + Add cylinder brand
+        </button>
+      )}
+
+      {isAdmin && showForm && (
+        <>
+          <CylinderBrandForm
+            editing={editing}
+            onSaved={() => {
+              closeForm();
+              loadStock();
+            }}
+            onCancel={closeForm}
+          />
+          <button
+            type="button"
+            onClick={closeForm}
+            className="mt-3 px-4 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary font-semibold text-sm hover:bg-surface3 hover:text-textPrimary">
+            Cancel
+          </button>
+        </>
       )}
 
       {error && (
@@ -235,7 +540,9 @@ export default function GasStockAdmin({ staffRole }) {
           </p>
           <ul className="space-y-1">
             {lowStockItems.map((item) => (
-              <li key={item.cylinder_brand_id} className="text-warning/80 text-sm">
+              <li
+                key={item.cylinder_brand_id}
+                className="text-warning/80 text-sm">
                 {item.brand} {item.weight_kg}kg — {item.filled_qty} filled
                 (threshold: {item.low_stock_threshold})
               </li>
@@ -244,7 +551,7 @@ export default function GasStockAdmin({ staffRole }) {
         </div>
       )}
 
-      <div className="rounded-2xl bg-surface2 border border-borderColor overflow-hidden">
+      <div className="mt-6 rounded-2xl bg-surface2 border border-borderColor overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-borderColor bg-surface1">
@@ -278,14 +585,19 @@ export default function GasStockAdmin({ staffRole }) {
                 isAdmin={isAdmin}
                 onToast={showToast}
                 onUpdated={loadStock}
+                onEdit={openEdit}
+                isExpanded={expandedId === item.cylinder_brand_id}
+                onCancelEdit={() => {
+                  setExpandedId(null);
+                  setEditing(null);
+                }}
               />
             ))}
             {stock.length === 0 && !loading && (
               <tr>
                 <td
                   colSpan={isAdmin ? 6 : 5}
-                  className="py-8 text-center text-textMuted text-sm"
-                >
+                  className="py-8 text-center text-textMuted text-sm">
                   No stock records found. Add cylinder brands first.
                 </td>
               </tr>
@@ -295,7 +607,10 @@ export default function GasStockAdmin({ staffRole }) {
       </div>
 
       <p className="text-textMuted text-xs mt-4">
-        Last updated: {stock[0]?.updated_at ? new Date(stock[0].updated_at).toLocaleString() : "—"}
+        Last updated:{" "}
+        {stock[0]?.updated_at
+          ? new Date(stock[0].updated_at).toLocaleString()
+          : "—"}
       </p>
 
       {oversells.length > 0 && (
@@ -340,21 +655,31 @@ export default function GasStockAdmin({ staffRole }) {
                   const stockAdjusted =
                     flag.item_type !== "cylinder" ||
                     (!!matchingStock?.updated_at &&
-                      new Date(matchingStock.updated_at) > new Date(flag.created_at));
+                      new Date(matchingStock.updated_at) >
+                        new Date(flag.created_at));
 
                   return (
-                    <tr key={flag.id} className="border-b border-borderColor last:border-0">
+                    <tr
+                      key={flag.id}
+                      className="border-b border-borderColor last:border-0">
                       <td className="py-3 px-4">
                         <p className="text-textPrimary font-semibold text-sm">
-                          {flag.item_name || `${flag.item_type} #${flag.cylinder_brand_id || flag.product_id}`}
+                          {flag.item_name ||
+                            `${flag.item_type} #${flag.cylinder_brand_id || flag.product_id}`}
                         </p>
-                        <p className="text-textMuted text-xs">Sale #{flag.sale_id}</p>
+                        <p className="text-textMuted text-xs">
+                          Sale #{flag.sale_id}
+                        </p>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <span className="text-danger font-semibold text-sm">{flag.requested}</span>
+                        <span className="text-danger font-semibold text-sm">
+                          {flag.requested}
+                        </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <span className="text-textSecondary text-sm">{flag.available}</span>
+                        <span className="text-textSecondary text-sm">
+                          {flag.available}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <span className="text-textSecondary text-sm">
@@ -371,12 +696,13 @@ export default function GasStockAdmin({ staffRole }) {
                                 ? "Mark this oversell as reviewed"
                                 : "Edit the stock quantity above to reflect the actual on-hand count before resolving"
                             }
-                            className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
+                            className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-40 disabled:cursor-not-allowed">
                             Resolve
                           </button>
                           {!stockAdjusted && (
-                            <p className="text-textMuted text-xs mt-1">Adjust stock first</p>
+                            <p className="text-textMuted text-xs mt-1">
+                              Adjust stock first
+                            </p>
                           )}
                         </td>
                       )}

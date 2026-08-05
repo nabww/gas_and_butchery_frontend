@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   listCorporateAccounts,
   createCorporateAccount,
@@ -12,6 +12,8 @@ import {
   searchCustomers,
   createCustomer,
   getProducts,
+  initiateM2pesa,
+  getM2pesaStatus,
 } from "../lib/api";
 
 const formatKes = (amount) =>
@@ -19,6 +21,252 @@ const formatKes = (amount) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const formatInvoiceDate = (value) => {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-KE", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+};
+
+const formatInvoiceSerial = (invoice) => {
+  const invoiceDate = invoice?.created_at
+    ? new Date(invoice.created_at)
+    : new Date();
+  const dateStamp = [
+    invoiceDate.getFullYear(),
+    String(invoiceDate.getMonth() + 1).padStart(2, "0"),
+    String(invoiceDate.getDate()).padStart(2, "0"),
+  ].join("");
+
+  return `INV-${dateStamp}-${String(invoice?.id || 0).padStart(4, "0")}`;
+};
+
+const buildInvoiceHtml = (invoice, account) => {
+  const serial = formatInvoiceSerial(invoice);
+  const customerName = account?.customer_name || "Corporate customer";
+  const customerPhone = account?.customer_phone || "—";
+  const issueDate = formatInvoiceDate(invoice?.created_at || new Date());
+  const dueDate = formatInvoiceDate(
+    invoice?.due_date ||
+      invoice?.covers_up_to ||
+      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+  );
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${serial}</title>
+        <style>
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            background: #f5f7fb;
+            color: #111827;
+            padding: 28px;
+          }
+          .invoice {
+            max-width: 840px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #dfe3eb;
+            border-radius: 18px;
+            padding: 32px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 18px;
+            margin-bottom: 20px;
+          }
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+          }
+          .logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #f3f4f6, #dfe7ef);
+            border: 1px solid #d1d5db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #374151;
+            font-size: 12px;
+            text-transform: uppercase;
+          }
+          .business-name {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+          }
+          .business-meta {
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: #4b5563;
+          }
+          .invoice-meta {
+            text-align: right;
+          }
+          .eyebrow {
+            margin: 0;
+            font-size: 11px;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #6b7280;
+          }
+          .serial {
+            margin: 8px 0 0;
+            font-size: 24px;
+            font-weight: 700;
+          }
+          .section-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+          }
+          .card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px 16px;
+            background: #fafbfc;
+          }
+          .label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #6b7280;
+          }
+          .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+          }
+          .totals {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+          }
+          .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+          }
+          .totals-row:last-child {
+            border-bottom: none;
+          }
+          .totals-row.total {
+            background: #111827;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+          }
+          .footer {
+            margin-top: 28px;
+            font-size: 12px;
+            color: #4b5563;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 12px;
+          }
+          @media print {
+            body {
+              background: #fff;
+              padding: 0;
+            }
+            .invoice {
+              box-shadow: none;
+              border: none;
+              border-radius: 0;
+              max-width: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice">
+          <div class="header">
+            <div class="brand">
+              <div class="logo">Logo</div>
+              <div>
+                <h1 class="business-name">TeziPOS</h1>
+                <p class="business-meta">Butchery & Gas · Corporate Accounts</p>
+              </div>
+            </div>
+            <div class="invoice-meta">
+              <p class="eyebrow">Invoice</p>
+              <div class="serial">${serial}</div>
+            </div>
+          </div>
+
+          <div class="section-grid">
+            <div class="card">
+              <span class="label">Bill To</span>
+              <div class="value">${customerName}</div>
+              <div class="value" style="margin-top: 6px;">${customerPhone}</div>
+            </div>
+            <div class="card">
+              <span class="label">Invoice Details</span>
+              <div class="value">Type: ${invoice?.type || "transaction"}</div>
+              <div class="value" style="margin-top: 6px;">Status: ${invoice?.status || "unpaid"}</div>
+            </div>
+          </div>
+
+          <div class="section-grid">
+            <div class="card">
+              <span class="label">Issue Date</span>
+              <div class="value">${issueDate}</div>
+            </div>
+            <div class="card">
+              <span class="label">Due Date</span>
+              <div class="value">${dueDate}</div>
+            </div>
+          </div>
+
+          <div class="totals">
+            <div class="totals-row">
+              <span>Invoice total</span>
+              <span>${formatKes(invoice?.total || 0)}</span>
+            </div>
+            <div class="totals-row">
+              <span>Amount paid</span>
+              <span>${formatKes(invoice?.paid_amount || 0)}</span>
+            </div>
+            <div class="totals-row">
+              <span>Balance due</span>
+              <span>${formatKes(Math.max(0, (parseFloat(invoice?.total || 0) || 0) - (parseFloat(invoice?.paid_amount || 0) || 0)))}</span>
+            </div>
+            <div class="totals-row total">
+              <span>Grand total</span>
+              <span>${formatKes(invoice?.total || 0)}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            <strong>Notes:</strong> This invoice was generated for the corporate account and is intended for PDF export and record keeping.
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+};
 
 function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
   const [phone, setPhone] = useState(initialPhone || "");
@@ -34,13 +282,18 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
       return;
     }
     if (!consentGiven) {
-      setError("The customer must consent to their data being retained before registering");
+      setError(
+        "The customer must consent to their data being retained before registering",
+      );
       return;
     }
     setSaving(true);
     setError("");
     try {
-      const customer = await createCustomer(phone, name, { consentGiven, smsOptIn });
+      const customer = await createCustomer(phone, name, {
+        consentGiven,
+        smsOptIn,
+      });
       onCreated(customer);
     } catch (err) {
       setError(err.message || "Failed to register customer");
@@ -54,7 +307,9 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
 
   return (
     <div className="mt-1 p-3 rounded-lg bg-surface1 border border-borderColor space-y-2">
-      <p className="text-textSecondary text-xs font-semibold">Register a new customer</p>
+      <p className="text-textSecondary text-xs font-semibold">
+        Register a new customer
+      </p>
       <input
         className={input}
         placeholder="Phone (e.g. +254712345678)"
@@ -75,8 +330,8 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
           className="mt-0.5 w-4 h-4 accent-primary shrink-0"
         />
         <span>
-          Customer consents to their phone number/name being retained (required — Data Protection
-          Act).
+          Customer consents to their phone number/name being retained (required
+          — Data Protection Act).
         </span>
       </label>
       <label className="flex items-center gap-2 text-xs text-textSecondary">
@@ -117,7 +372,9 @@ function RegisterForm({ onRegistered }) {
 
   useEffect(() => {
     if (customerQuery.length > 2) {
-      searchCustomers(customerQuery).then(setResults).catch(() => setResults([]));
+      searchCustomers(customerQuery)
+        .then(setResults)
+        .catch(() => setResults([]));
     } else {
       setResults([]);
     }
@@ -151,7 +408,9 @@ function RegisterForm({ onRegistered }) {
       {selectedCustomer ? (
         <div className="md:col-span-1 flex items-center justify-between px-3 py-2 rounded-lg bg-surface1 border border-borderColor">
           <div>
-            <p className="text-textPrimary text-sm font-semibold">{selectedCustomer.name || "Unnamed"}</p>
+            <p className="text-textPrimary text-sm font-semibold">
+              {selectedCustomer.name || "Unnamed"}
+            </p>
             <p className="text-textMuted text-xs">{selectedCustomer.phone}</p>
           </div>
           <button
@@ -180,10 +439,14 @@ function RegisterForm({ onRegistered }) {
                         setResults([]);
                       }}
                       className="w-full text-left px-3 py-2 hover:bg-surface3 text-sm">
-                      <span className="text-textPrimary font-medium">{c.name || "Unnamed"}</span>
+                      <span className="text-textPrimary font-medium">
+                        {c.name || "Unnamed"}
+                      </span>
                       <span className="text-textMuted"> · {c.phone}</span>
                       {c.corporate_account_id && (
-                        <span className="text-warning text-xs ml-2">already corporate</span>
+                        <span className="text-warning text-xs ml-2">
+                          already corporate
+                        </span>
                       )}
                     </button>
                   ))}
@@ -225,7 +488,140 @@ function RegisterForm({ onRegistered }) {
         className="px-4 py-2 rounded-lg bg-primary text-onPrimary font-semibold text-sm disabled:opacity-50">
         {saving ? "Registering..." : "Register corporate account"}
       </button>
-      {error && <p className="md:col-span-3 text-danger text-xs font-semibold">{error}</p>}
+      {error && (
+        <p className="md:col-span-3 text-danger text-xs font-semibold">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit }) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("cash");
+  const [mpesaPhone, setMpesaPhone] = useState("");
+
+  useEffect(() => {
+    if (open && amountDue) {
+      setAmount(String(parseFloat(amountDue || 0).toFixed(2)));
+      setMethod("cash");
+      setMpesaPhone("");
+    }
+  }, [open, amountDue]);
+
+  if (!open) return null;
+
+  const submit = () => {
+    const numeric = Number.parseFloat(amount);
+    if (!amount || Number.isNaN(numeric) || numeric <= 0) {
+      return;
+    }
+    if (method === "mpesa" && !mpesaPhone.trim()) {
+      return;
+    }
+    onSubmit({
+      invoiceId,
+      amount: numeric,
+      method,
+      phone: method === "mpesa" ? mpesaPhone.trim() : undefined,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-surface1 border border-borderColor p-5 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-textMuted">
+              Record payment
+            </p>
+            <h3 className="text-xl font-bold text-textPrimary">
+              Invoice #{invoiceId}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-textMuted hover:text-textPrimary text-sm">
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl bg-surface2 border border-borderColor p-3">
+            <p className="text-xs text-textMuted uppercase tracking-[0.14em]">
+              Balance due
+            </p>
+            <p className="mt-1 text-lg font-bold text-primary">
+              {formatKes(amountDue)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-textSecondary mb-1">
+              Amount
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full rounded-lg bg-surface2 border border-borderColor px-3 py-2 text-textPrimary"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-textSecondary mb-1">
+              Method
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {["cash", "mpesa", "account"].map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setMethod(option)}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide border ${
+                    method === option
+                      ? "bg-primary text-onPrimary border-primary"
+                      : "bg-surface2 text-textSecondary border-borderColor"
+                  }`}>
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {method === "mpesa" && (
+            <div>
+              <label className="block text-xs font-medium text-textSecondary mb-1">
+                M-Pesa phone
+              </label>
+              <input
+                type="tel"
+                value={mpesaPhone}
+                onChange={(e) => setMpesaPhone(e.target.value)}
+                className="w-full rounded-lg bg-surface2 border border-borderColor px-3 py-2 text-textPrimary"
+                placeholder="e.g. 0712345678"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold">
+            Save payment
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -239,16 +635,64 @@ function AccountDetail({ account, onUpdated, onClose }) {
   const [newPrice, setNewPrice] = useState("");
   const [invoices, setInvoices] = useState([]);
   const [coversUpTo, setCoversUpTo] = useState("");
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [paymentModal, setPaymentModal] = useState({
+    open: false,
+    invoiceId: null,
+    amountDue: 0,
+  });
   const [message, setMessage] = useState("");
+  const mpesaPollRef = useRef(null);
+
+  const messageTone = (() => {
+    const text = (message || "").toLowerCase();
+    if (
+      text.includes("failed") ||
+      text.includes("not completed") ||
+      text.includes("check again")
+    ) {
+      return "border-danger/30 bg-danger/10 text-danger";
+    }
+    if (
+      text.includes("confirmed") ||
+      text.includes("recorded") ||
+      text.includes("success")
+    ) {
+      return "border-success/30 bg-success/10 text-success";
+    }
+    if (
+      text.includes("waiting") ||
+      text.includes("sent") ||
+      text.includes("pending")
+    ) {
+      return "border-warning/30 bg-warning/10 text-warning";
+    }
+    return "border-primary/20 bg-primary/5 text-textPrimary";
+  })();
+
+  const stopMpesaPolling = () => {
+    if (mpesaPollRef.current) {
+      clearInterval(mpesaPollRef.current);
+      mpesaPollRef.current = null;
+    }
+  };
+
+  useEffect(() => () => stopMpesaPolling(), []);
 
   const load = () => {
-    getCorporatePricing(account.id).then(setPricing).catch(() => setPricing([]));
-    listCorporateInvoices(account.id).then(setInvoices).catch(() => setInvoices([]));
+    getCorporatePricing(account.id)
+      .then(setPricing)
+      .catch(() => setPricing([]));
+    listCorporateInvoices(account.id)
+      .then(setInvoices)
+      .catch(() => setInvoices([]));
   };
 
   useEffect(() => {
     load();
-    getProducts().then(setProducts).catch(() => setProducts([]));
+    getProducts()
+      .then(setProducts)
+      .catch(() => setProducts([]));
   }, [account.id]);
 
   const saveCreditLimit = async () => {
@@ -266,7 +710,11 @@ function AccountDetail({ account, onUpdated, onClose }) {
   const addPricing = async () => {
     if (!newProductId || !newPrice) return;
     try {
-      const updated = await setCorporatePricing(account.id, newProductId, newPrice);
+      const updated = await setCorporatePricing(
+        account.id,
+        newProductId,
+        newPrice,
+      );
       setPricing(updated);
       setNewProductId("");
       setNewPrice("");
@@ -300,14 +748,82 @@ function AccountDetail({ account, onUpdated, onClose }) {
     }
   };
 
-  const payInvoice = async (invoiceId, amountDue) => {
-    const amount = window.prompt(`Amount to record against this invoice (balance due: ${formatKes(amountDue)})`);
-    if (!amount) return;
+  const payInvoice = async (
+    invoiceId,
+    amountDue,
+    method = "cash",
+    amountOverride = null,
+    phone = "",
+  ) => {
+    const amount = amountOverride ?? Number.parseFloat(amountDue || 0);
+    if (!amount || Number.isNaN(amount) || amount <= 0) return;
+
+    if (method === "mpesa") {
+      if (!phone || !phone.trim()) {
+        setMessage("Phone number is required for M-Pesa payments.");
+        return;
+      }
+      try {
+        setMessage("Sending M-Pesa STK push...");
+        const transaction = await initiateM2pesa(phone.trim(), amount);
+        const mpesaTransactionId = transaction?.mpesa_transaction_id;
+        if (!mpesaTransactionId) {
+          throw new Error("M-Pesa request was not created.");
+        }
+
+        stopMpesaPolling();
+        let pollCount = 0;
+        const maxPolls = 30;
+
+        mpesaPollRef.current = setInterval(async () => {
+          try {
+            pollCount += 1;
+            const status = await getM2pesaStatus(mpesaTransactionId);
+            const resultCode = status?.resultCode ?? status?.ResultCode ?? "";
+
+            if (status?.pending === false || resultCode !== "") {
+              stopMpesaPolling();
+              if (resultCode === "0" || status?.resultCode === "0") {
+                await recordInvoicePayment(invoiceId, amount, "mpesa");
+                load();
+                onUpdated();
+                setMessage("M-Pesa payment confirmed and recorded.");
+                setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+              } else {
+                setMessage(
+                  status?.resultDesc ||
+                    "M-Pesa payment was not completed. Please try again.",
+                );
+              }
+              return;
+            }
+
+            if (pollCount >= maxPolls) {
+              stopMpesaPolling();
+              setMessage(
+                "M-Pesa payment is still pending. Please check again.",
+              );
+            }
+          } catch (err) {
+            stopMpesaPolling();
+            setMessage(err.message || "M-Pesa status check failed.");
+          }
+        }, 3000);
+
+        setMessage("STK push sent. Waiting for customer confirmation...");
+        return;
+      } catch (err) {
+        setMessage(err.message || "Failed to send M-Pesa request");
+        return;
+      }
+    }
+
     try {
-      await recordInvoicePayment(invoiceId, amount, "cash");
+      await recordInvoicePayment(invoiceId, amount, method);
       load();
       onUpdated();
       setMessage("Payment recorded.");
+      setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
     } catch (err) {
       setMessage(err.message || "Failed to record payment");
     }
@@ -315,22 +831,186 @@ function AccountDetail({ account, onUpdated, onClose }) {
 
   const input =
     "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
-  const availableCredit = parseFloat(account.credit_limit) - parseFloat(account.current_balance);
+  const availableCredit =
+    parseFloat(account.credit_limit) - parseFloat(account.current_balance);
+
+  const printInvoice = (invoice) => {
+    const printWindow = window.open("", "_blank", "width=1000,height=900");
+    if (!printWindow) {
+      setMessage("Please allow pop-ups to download the invoice as PDF.");
+      return;
+    }
+
+    const invoiceHtml = buildInvoiceHtml(invoice, account);
+    printWindow.document.write(invoiceHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
 
   return (
     <div className="mt-3 p-4 rounded-2xl bg-surface2 border border-borderColor space-y-4">
       {message && (
-        <p className="text-textSecondary text-xs">{message}</p>
+        <div className={`rounded-xl border px-3 py-3 ${messageTone}`}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
+            Payment status
+          </p>
+          <p className="mt-1 text-sm font-medium">{message}</p>
+        </div>
+      )}
+
+      <PaymentModal
+        open={paymentModal.open}
+        invoiceId={paymentModal.invoiceId}
+        amountDue={paymentModal.amountDue}
+        onClose={() =>
+          setPaymentModal({ open: false, invoiceId: null, amountDue: 0 })
+        }
+        onSubmit={({ invoiceId, amount, method, phone }) =>
+          payInvoice(invoiceId, paymentModal.amountDue, method, amount, phone)
+        }
+      />
+
+      {selectedInvoice && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl border border-slate-300 bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 uppercase">
+                    Logo
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold">TeziPOS</p>
+                    <p className="text-[11px] text-slate-500 uppercase tracking-[0.12em]">
+                      Butchery & Gas · Corporate Accounts
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Tax Invoice
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {formatInvoiceSerial(selectedInvoice)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Customer
+                  </p>
+                  <p className="mt-2 font-bold text-slate-900">
+                    {account.customer_name}
+                  </p>
+                  <p className="text-slate-600">{account.customer_phone}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Invoice details
+                  </p>
+                  <p className="mt-2 text-slate-700">
+                    Date: {formatInvoiceDate(selectedInvoice.created_at)}
+                  </p>
+                  <p className="text-slate-700">
+                    Due:{" "}
+                    {formatInvoiceDate(
+                      selectedInvoice.due_date ||
+                        selectedInvoice.covers_up_to ||
+                        selectedInvoice.created_at,
+                    )}
+                  </p>
+                  <p className="text-slate-700">
+                    Type: {selectedInvoice.type || "transaction"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="grid grid-cols-[1.5fr_0.7fr_0.8fr] bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 px-3 py-2">
+                  <span>Description</span>
+                  <span className="text-center">Qty</span>
+                  <span className="text-right">Amount</span>
+                </div>
+                <div className="grid grid-cols-[1.5fr_0.7fr_0.8fr] items-center px-3 py-3 text-sm border-t border-slate-200">
+                  <span className="font-medium text-slate-900">
+                    Corporate account invoice
+                  </span>
+                  <span className="text-center text-slate-700">1</span>
+                  <span className="text-right font-semibold text-slate-900">
+                    {formatKes(selectedInvoice.total)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="ml-auto w-full max-w-xs space-y-2 text-sm">
+                <div className="flex items-center justify-between text-slate-700">
+                  <span>Subtotal</span>
+                  <span>{formatKes(selectedInvoice.total)}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-700">
+                  <span>Paid</span>
+                  <span>{formatKes(selectedInvoice.paid_amount || 0)}</span>
+                </div>
+                <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-base font-bold text-slate-900">
+                  <span>Balance due</span>
+                  <span>
+                    {formatKes(
+                      Math.max(
+                        0,
+                        (parseFloat(selectedInvoice.total || 0) || 0) -
+                          (parseFloat(selectedInvoice.paid_amount || 0) || 0),
+                      ),
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 pt-3 text-[11px] text-slate-500">
+                <p className="font-semibold uppercase tracking-[0.12em] text-slate-600 mb-1">
+                  Notes
+                </p>
+                <p>
+                  Thank you for your business. This invoice is for the corporate
+                  account statement and is intended for PDF export and record
+                  keeping.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoice(null)}
+                  className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold">
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => printInvoice(selectedInvoice)}
+                  className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold">
+                  Download PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="p-3 rounded-lg bg-surface1 border border-borderColor">
           <p className="text-textMuted text-xs">Running balance</p>
-          <p className="text-textPrimary font-bold">{formatKes(account.current_balance)}</p>
+          <p className="text-textPrimary font-bold">
+            {formatKes(account.current_balance)}
+          </p>
         </div>
         <div className="p-3 rounded-lg bg-surface1 border border-borderColor">
           <p className="text-textMuted text-xs">Available credit</p>
-          <p className={`font-bold ${availableCredit < 0 ? "text-danger" : "text-success"}`}>
+          <p
+            className={`font-bold ${availableCredit < 0 ? "text-danger" : "text-success"}`}>
             {formatKes(availableCredit)}
           </p>
         </div>
@@ -358,16 +1038,24 @@ function AccountDetail({ account, onUpdated, onClose }) {
         </p>
         <div className="space-y-1 mb-2">
           {pricing.length === 0 && (
-            <p className="text-textMuted text-xs">No custom prices set — standard pricing applies.</p>
+            <p className="text-textMuted text-xs">
+              No custom prices set — standard pricing applies.
+            </p>
           )}
           {pricing.map((p) => (
-            <div key={p.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-surface1 border border-borderColor">
+            <div
+              key={p.id}
+              className="flex items-center justify-between text-sm p-2 rounded-lg bg-surface1 border border-borderColor">
               <span className="text-textPrimary">
                 {p.product_name} — standard {formatKes(p.standard_price)}
               </span>
               <span className="flex items-center gap-2">
-                <span className="text-primary font-semibold">{formatKes(p.custom_price)}</span>
-                <button onClick={() => removePricing(p.product_id)} className="text-textMuted hover:text-danger text-xs">
+                <span className="text-primary font-semibold">
+                  {formatKes(p.custom_price)}
+                </span>
+                <button
+                  onClick={() => removePricing(p.product_id)}
+                  className="text-textMuted hover:text-danger text-xs">
                   Remove
                 </button>
               </span>
@@ -381,7 +1069,9 @@ function AccountDetail({ account, onUpdated, onClose }) {
             onChange={(e) => setNewProductId(e.target.value)}>
             <option value="">Select product</option>
             {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} (standard {formatKes(p.unit_price)})</option>
+              <option key={p.id} value={p.id}>
+                {p.name} (standard {formatKes(p.unit_price)})
+              </option>
             ))}
           </select>
           <input
@@ -393,7 +1083,9 @@ function AccountDetail({ account, onUpdated, onClose }) {
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
           />
-          <button onClick={addPricing} className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+          <button
+            onClick={addPricing}
+            className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
             Set price
           </button>
         </div>
@@ -401,38 +1093,73 @@ function AccountDetail({ account, onUpdated, onClose }) {
 
       <div>
         <p className="text-textSecondary text-xs font-semibold uppercase tracking-wide mb-2">
-          Invoices (user-triggered — never auto-generated)
+          Invoices
         </p>
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 items-center mb-2">
           <input
             className={input}
             type="date"
             value={coversUpTo}
             onChange={(e) => setCoversUpTo(e.target.value)}
           />
-          <button onClick={generateConsolidated} className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold shrink-0">
+          <button
+            onClick={generateConsolidated}
+            className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold shrink-0">
             Generate consolidated statement up to date
           </button>
         </div>
         <p className="text-textMuted text-xs mb-2">
-          Per-transaction invoices are generated from the sale/receipt itself once a sale is charged to this account.
+          Per-transaction invoices are generated from the sale/receipt itself
+          once a sale is charged to this account.
         </p>
         <div className="space-y-1">
-          {invoices.length === 0 && <p className="text-textMuted text-xs">No invoices yet.</p>}
+          {invoices.length === 0 && (
+            <p className="text-textMuted text-xs">No invoices yet.</p>
+          )}
           {invoices.map((inv) => (
-            <div key={inv.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-surface1 border border-borderColor">
+            <div
+              key={inv.id}
+              className="flex items-center justify-between text-sm p-2 rounded-lg bg-surface1 border border-borderColor">
               <span className="text-textPrimary">
                 #{inv.id} · {inv.type} · {formatKes(inv.total)}
-                {inv.covers_up_to && <span className="text-textMuted"> (up to {inv.covers_up_to.slice(0, 10)})</span>}
+                {inv.covers_up_to && (
+                  <span className="text-textMuted">
+                    {" "}
+                    (up to {inv.covers_up_to.slice(0, 10)})
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-2">
-                <span className={`text-xs font-semibold capitalize ${
-                  inv.status === "paid" ? "text-success" : inv.status === "partial" ? "text-warning" : "text-danger"
-                }`}>
+                <span
+                  className={`text-xs font-semibold capitalize ${
+                    inv.status === "paid"
+                      ? "text-success"
+                      : inv.status === "partial"
+                        ? "text-warning"
+                        : "text-danger"
+                  }`}>
                   {inv.status}
                 </span>
+                <button
+                  onClick={() => setSelectedInvoice(inv)}
+                  className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                  View invoice
+                </button>
+                <button
+                  onClick={() => printInvoice(inv)}
+                  className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                  PDF
+                </button>
                 {inv.status !== "paid" && (
-                  <button onClick={() => payInvoice(inv.id, inv.total)} className="text-textMuted hover:text-primary text-xs">
+                  <button
+                    onClick={() =>
+                      setPaymentModal({
+                        open: true,
+                        invoiceId: inv.id,
+                        amountDue: inv.total,
+                      })
+                    }
+                    className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
                     Record payment
                   </button>
                 )}
@@ -462,13 +1189,18 @@ export default function CorporateAccountsAdmin() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-textPrimary">Corporate Accounts</h1>
+      <h1 className="text-2xl font-bold text-textPrimary">
+        Corporate Accounts
+      </h1>
       <p className="text-textSecondary text-sm mt-1">
-        Credit limits and custom pricing are set individually per client — nothing here is shared or uniform across accounts.
+        Credit limits and custom pricing are set individually per client —
+        nothing here is shared or uniform across accounts.
       </p>
 
       {error && (
-        <p className="mt-4 p-3 rounded-xl bg-danger/10 text-danger text-sm">{error}</p>
+        <p className="mt-4 p-3 rounded-xl bg-danger/10 text-danger text-sm">
+          {error}
+        </p>
       )}
 
       {!showForm && (
@@ -497,19 +1229,27 @@ export default function CorporateAccountsAdmin() {
 
       <section className="mt-6 space-y-2">
         {accounts.length === 0 && (
-          <p className="text-textMuted text-sm">No corporate accounts registered yet.</p>
+          <p className="text-textMuted text-sm">
+            No corporate accounts registered yet.
+          </p>
         )}
         {accounts.map((account) => (
           <div key={account.id}>
             <div className="p-3 rounded-xl bg-surface2 border border-borderColor flex justify-between items-center text-sm">
               <div>
-                <p className="text-textPrimary font-semibold">{account.customer_name}</p>
+                <p className="text-textPrimary font-semibold">
+                  {account.customer_name}
+                </p>
                 <p className="text-textMuted text-xs">
-                  {account.customer_phone} · Balance {formatKes(account.current_balance)} / Limit {formatKes(account.credit_limit)}
+                  {account.customer_phone} · Balance{" "}
+                  {formatKes(account.current_balance)} / Limit{" "}
+                  {formatKes(account.credit_limit)}
                 </p>
               </div>
               <button
-                onClick={() => setExpandedId(expandedId === account.id ? null : account.id)}
+                onClick={() =>
+                  setExpandedId(expandedId === account.id ? null : account.id)
+                }
                 className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
                 {expandedId === account.id ? "Close" : "Manage"}
               </button>

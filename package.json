@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "git": "^0.1.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -20,6 +21,6 @@
     "vite": "^5.4.21"
   },
   "server": {
-  "host": "true"
-}
+    "host": "true"
+  }
 }

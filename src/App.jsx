@@ -8,6 +8,8 @@ import RewardsAdmin from "./pages/RewardsAdmin";
 import PromotionsAdmin from "./pages/PromotionsAdmin";
 import CorporateAccountsAdmin from "./pages/CorporateAccountsAdmin";
 import CustomersAdmin from "./pages/CustomersAdmin";
+import StaffAdmin from "./pages/StaffAdmin";
+import CatalogAdmin from "./pages/CatalogAdmin";
 import { getStoredStaff, logout } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
@@ -102,6 +104,10 @@ export default function App() {
           <PromotionsAdmin />
         ) : currentPath === "/corporate" ? (
           <CorporateAccountsAdmin />
+        ) : currentPath === "/staff" ? (
+          <StaffAdmin staffRole={staff.role} />
+        ) : currentPath === "/catalog" ? (
+          <CatalogAdmin staffRole={staff.role} />
         ) : (
           <Placeholder name={currentPath.replace("/", "") || "till"} />
         )}
