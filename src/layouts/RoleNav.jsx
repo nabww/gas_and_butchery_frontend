@@ -8,7 +8,7 @@ const NAV_BY_ROLE = {
   supervisor: [
     { label: 'Till', path: '/till' },
     { label: 'Overrides', path: '/overrides' },
-    { label: 'Stock', path: '/stock' },
+    { label: 'Catalog', path: '/catalog' },
   ],
   admin: [
     { label: 'Dashboard', path: '/dashboard' },
@@ -20,7 +20,6 @@ const NAV_BY_ROLE = {
     { label: 'Rewards', path: '/rewards' },
     { label: 'Promos', path: '/promotions' },
     { label: 'Corporate', path: '/corporate' },
-    { label: 'Stock', path: '/stock' },
     { label: 'Settings', path: '/settings' },
   ],
 };

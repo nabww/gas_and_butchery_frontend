@@ -1055,7 +1055,7 @@ function AccountDetail({ account, onUpdated, onClose }) {
                 </span>
                 <button
                   onClick={() => removePricing(p.product_id)}
-                  className="text-textMuted hover:text-danger text-xs">
+                    className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
                   Remove
                 </button>
               </span>

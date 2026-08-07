@@ -137,3 +137,47 @@ button:hover {
 button:active {
   transform: scale(0.98);
 }
+
+/* Centered CoreUI tabs for the Catalog & Stock page */
+.catalog-stock-tabs .nav {
+  justify-content: center;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.catalog-stock-tabs .nav-link {
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.75rem 1.5rem;
+  transition: color 200ms ease, border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+.catalog-stock-tabs .nav-link:hover {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.catalog-stock-tabs .nav-link.active {
+  color: var(--primary) !important;
+  background: transparent !important;
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.catalog-stock-tabs .tab-content {
+  animation: fadeIn 200ms ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
