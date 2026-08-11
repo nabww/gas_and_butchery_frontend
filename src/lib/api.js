@@ -577,6 +577,34 @@ export async function redeemPoints(customerId, saleId, points) {
   });
 }
 
+// ========== REPORTS API ==========
+
+export async function getSalesReport(startDate, endDate) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  return apiFetch(`/reports/sales?${params.toString()}`);
+}
+
+export async function getLoyaltyReport() {
+  return apiFetch("/reports/loyalty");
+}
+
+export async function getCustomersReport() {
+  return apiFetch("/reports/customers");
+}
+
+export async function getSyncReport() {
+  return apiFetch("/reports/sync");
+}
+
+export async function getLedgerReport(startDate, endDate) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  return apiFetch(`/reports/ledger?${params.toString()}`);
+}
+
 // ========== SYNC API ==========
 
 export async function getSyncSnapshot(locationId) {
