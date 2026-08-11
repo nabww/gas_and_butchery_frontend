@@ -49,7 +49,7 @@ export function CartProvider({ children }) {
   };
 
   const applyDiscount = (amount) => {
-    setDiscountAmount(Math.min(amount, subtotal));
+    setDiscountAmount((prev) => Math.min(parseFloat(prev || 0) + amount, subtotal));
   };
 
   const resetCart = () => {

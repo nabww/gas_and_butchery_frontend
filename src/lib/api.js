@@ -374,6 +374,10 @@ export async function generateTransactionInvoice(corporateAccountId, saleId) {
   });
 }
 
+export async function getInvoiceDetails(invoiceId) {
+  return apiFetch(`/corporate/invoices/${invoiceId}/details`);
+}
+
 export async function generateConsolidatedInvoice(corporateAccountId, coversUpTo) {
   return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices/consolidated`, {
     method: "POST",
@@ -412,8 +416,9 @@ export async function updateProduct(productId, product) {
   });
 }
 
-export async function getCylinderBrands() {
-  return apiFetch("/products/cylinder-brands");
+export async function getCylinderBrands(includeInactive = false) {
+  const query = includeInactive ? "?include_inactive=true" : "";
+  return apiFetch(`/products/cylinder-brands${query}`);
 }
 
 export async function createCylinderBrand(brandData) {
@@ -520,6 +525,17 @@ export async function markPromoPayoutPaid(payoutId) {
   return apiFetch(`/promotions/payouts/${payoutId}/paid`, { method: "PUT" });
 }
 
+export async function markPromoPayoutUnfulfilled(payoutId) {
+  return apiFetch(`/promotions/payouts/${payoutId}/unfulfilled`, { method: "PUT" });
+}
+
+export async function approvePromoPayout(payoutId, pin) {
+  return apiFetch(`/promotions/payouts/${payoutId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
 // ========== STOCK ADMIN API ==========
 
 export async function getCylinderStockAdmin() {
@@ -572,4 +588,43 @@ export async function uploadSyncSnapshot(snapshot) {
     method: "POST",
     body: JSON.stringify(snapshot),
   });
+}
+
+export async function getBusinessConfig() {
+  return apiFetch("/config");
+}
+
+export async function updateBusinessConfig(updates) {
+  return apiFetch("/config", {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function uploadBusinessLogo(file) {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("logo", file);
+
+  const res = await fetch(`${API_BASE}/config/logo`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  const data = contentType.includes("application/json")
+    ? await res.json()
+    : await res.text();
+
+  if (!res.ok) {
+    const err = new Error(data?.error || "Logo upload failed");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+
+  return data;
 }

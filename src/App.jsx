@@ -3,7 +3,7 @@ import SignIn from "./pages/SignIn";
 import RoleNav from "./layouts/RoleNav";
 import Till from "./pages/Till";
 import CatalogStockAdmin from "./pages/CatalogStockAdmin";
-import LoyaltySettings from "./pages/LoyaltySettings";
+import Settings from "./pages/Settings";
 import RewardsAdmin from "./pages/RewardsAdmin";
 import PromotionsAdmin from "./pages/PromotionsAdmin";
 import CorporateAccountsAdmin from "./pages/CorporateAccountsAdmin";
@@ -97,7 +97,7 @@ export default function App() {
         ) : currentPath === "/catalog" || currentPath === "/stock" ? (
           <CatalogStockAdmin staffRole={staff.role} />
         ) : currentPath === "/settings" ? (
-          <LoyaltySettings />
+          <Settings />
         ) : currentPath === "/rewards" ? (
           <RewardsAdmin />
         ) : currentPath === "/promotions" ? (

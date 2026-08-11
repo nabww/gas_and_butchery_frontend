@@ -4,8 +4,10 @@ import {
   getPromoPayouts,
   getPromoRules,
   markPromoPayoutPaid,
+  markPromoPayoutUnfulfilled,
   updatePromoRule,
 } from "../lib/api";
+import PayoutActionModal from "../components/PayoutActionModal";
 const blank = {
   type: "cashback",
   trigger_type: "nth_sale",
@@ -19,6 +21,7 @@ const blank = {
 export default function PromotionsAdmin() {
   const [rules, setRules] = useState([]),
     [payouts, setPayouts] = useState([]),
+    [selectedPayout, setSelectedPayout] = useState(null),
     [form, setForm] = useState(blank),
     [editing, setEditing] = useState(null),
     [message, setMessage] = useState(""),
@@ -34,6 +37,26 @@ export default function PromotionsAdmin() {
   useEffect(() => {
     load();
   }, []);
+  const handleIssuePayout = async () => {
+    if (!selectedPayout) return;
+    try {
+      await markPromoPayoutPaid(selectedPayout.id);
+      setSelectedPayout(null);
+      load();
+    } catch (err) {
+      setMessage(err.message || "Failed to mark payout as paid.");
+    }
+  };
+  const handleUnfulfilledPayout = async () => {
+    if (!selectedPayout) return;
+    try {
+      await markPromoPayoutUnfulfilled(selectedPayout.id);
+      setSelectedPayout(null);
+      load();
+    } catch (err) {
+      setMessage(err.message || "Failed to mark payout as unfulfilled.");
+    }
+  };
   const submit = async (event) => {
     event.preventDefault();
     try {
@@ -251,24 +274,26 @@ export default function PromotionsAdmin() {
         {payouts
           .filter((p) => p.type === "cashback")
           .map((p) => (
-            <div
+            <button
               key={p.id}
-              className="p-3 mb-2 rounded-xl bg-surface2 border border-borderColor flex justify-between text-sm">
+              type="button"
+              onClick={() => setSelectedPayout(p)}
+              className="w-full p-3 mb-2 rounded-xl bg-surface2 border border-borderColor flex justify-between text-sm text-left hover:border-borderStrong hover:bg-surface3 transition-all">
               <span className="text-textPrimary">
                 {p.customer_name || p.customer_phone} — KES{" "}
                 {Number(p.cashback_amount).toFixed(2)}
               </span>
-              <button
-                className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary"
-                onClick={async () => {
-                  await markPromoPayoutPaid(p.id);
-                  load();
-                }}>
-                Mark paid
-              </button>
-            </div>
+              <span className="text-textSecondary text-xs">Action</span>
+            </button>
           ))}
       </section>
+
+      <PayoutActionModal
+        payout={selectedPayout}
+        onClose={() => setSelectedPayout(null)}
+        onIssue={handleIssuePayout}
+        onUnfulfilled={handleUnfulfilledPayout}
+      />
     </main>
   );
 }

@@ -6,11 +6,14 @@ import {
   getSaleReceipt,
   completeAccountSale,
   verifyApprovalPin,
+  approvePromoPayout,
 } from "../lib/api";
 import { recordCashSale, recordMpesaSale, recordAccountSale } from "../lib/saleOperations";
 import { syncPendingSales } from "../lib/db/syncQueue";
 import { isOfflineSalesEnabled } from "../lib/settings";
 import { useCart } from "../contexts/CartContext";
+import Checkmark from "./Checkmark";
+import PromoWinModal from "./PromoWinModal";
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount).toLocaleString("en-KE", {
@@ -38,6 +41,9 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
   const [receipt, setReceipt] = useState("");
   const [showReceipt, setShowReceipt] = useState(false);
   const [promoMessage, setPromoMessage] = useState("");
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [pendingPromoWins, setPendingPromoWins] = useState([]);
+  const [receiptSaleId, setReceiptSaleId] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingAccountCharge, setPendingAccountCharge] = useState(null);
   const [approvalPin, setApprovalPin] = useState("");
@@ -45,6 +51,8 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [mpesaTransaction, setMpesaTransaction] = useState(null);
   const [mpesaStatus, setMpesaStatus] = useState(null); // null | "pending" | "timeout" | "failed"
+  const [mpesaSuccess, setMpesaSuccess] = useState(false);
+  const mpesaSuccessTimeoutRef = useRef(null);
   const mpesaPollRef = useRef(null);
 
   const stopMpesaPolling = () => {
@@ -86,6 +94,21 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
       setPaymentPhone(customer?.phone || "");
     }
   }, [paymentMethod, customer?.phone, phoneManuallyEdited]);
+
+  // Clear stale promo/receipt state when the sale or customer changes.
+  useEffect(() => {
+    setShowPromoModal(false);
+    setPendingPromoWins([]);
+    setReceiptSaleId(null);
+    setPromoMessage("");
+    setShowReceipt(false);
+    setReceipt("");
+    setMpesaSuccess(false);
+    setError("");
+    setPendingAccountCharge(null);
+    setApprovalPin("");
+    setApprovalError("");
+  }, [saleLocalId, customer?.id]);
 
   if (items.length === 0) {
     return null;
@@ -174,16 +197,25 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           throw err;
         }
 
-        const receiptText = await getSaleReceipt(realSaleId);
-        setReceipt(receiptText);
-        setShowReceipt(true);
-        setTimeout(() => {
-          resetCart();
-          setShowReceipt(false);
-          setReceipt("");
-          setPromoMessage("");
-          onSaleCompleted?.();
-        }, 3000);
+        const promo = syncResult?.promoWins?.find(
+          (entry) => entry.saleId === realSaleId,
+        );
+        if (promo?.wins?.length) {
+          setReceiptSaleId(realSaleId);
+          setPendingPromoWins(promo.wins);
+          setShowPromoModal(true);
+        } else {
+          const receiptText = await getSaleReceipt(realSaleId);
+          setReceipt(receiptText);
+          setShowReceipt(true);
+          setTimeout(() => {
+            resetCart();
+            setShowReceipt(false);
+            setReceipt("");
+            setPromoMessage("");
+            onSaleCompleted?.();
+          }, 3000);
+        }
         setLoading(false);
         return;
       }
@@ -193,18 +225,28 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           const syncResult = await syncPendingSales();
           const serverSaleId =
             syncResult?.saleServerIds?.[saleLocalId] || saleId;
-          const receiptText =
-            serverSaleId && serverSaleId !== saleLocalId
-              ? await getSaleReceipt(serverSaleId)
-              : "Receipt will print after sync.";
-          const promo = syncResult?.promoWins?.find((entry) => entry.saleId === serverSaleId);
-          if (promo?.wins?.length) {
-            setPromoMessage(`🎉 ${promo.wins.map((win) => win.type === "cashback"
-              ? `Cashback win: KES ${Number(win.cashback_amount).toFixed(2)}`
-              : `Prize win: ${win.reward?.name || "a reward"}`).join(" · ")}`);
+          const promo = syncResult?.promoWins?.find(
+            (entry) => entry.saleId === serverSaleId,
+          );
+          if (promo?.wins?.length && serverSaleId && serverSaleId !== saleLocalId) {
+            setReceiptSaleId(serverSaleId);
+            setPendingPromoWins(promo.wins);
+            setShowPromoModal(true);
+          } else {
+            const receiptText =
+              serverSaleId && serverSaleId !== saleLocalId
+                ? await getSaleReceipt(serverSaleId)
+                : "Receipt will print after sync.";
+            setReceipt(receiptText);
+            setShowReceipt(true);
+            setTimeout(() => {
+              resetCart();
+              setShowReceipt(false);
+              setReceipt("");
+              setPromoMessage("");
+              onSaleCompleted?.();
+            }, 3000);
           }
-          setReceipt(receiptText);
-          setShowReceipt(true);
         } catch (syncErr) {
           setError(
             "Sale saved locally. It will sync when the connection is stable.",
@@ -216,13 +258,6 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         );
       }
 
-      setTimeout(() => {
-        resetCart();
-        setShowReceipt(false);
-        setReceipt("");
-        setPromoMessage("");
-        onSaleCompleted?.();
-      }, 3000);
     } catch (err) {
       setError(err.message || "Failed to process payment");
     } finally {
@@ -287,18 +322,36 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         onNewMpesaCustomer?.(payer);
       }
 
-      const receiptText = await getSaleReceipt(realSaleId);
-      setReceipt(receiptText);
-      setShowReceipt(true);
+      const promo = syncResult?.promoWins?.find(
+        (entry) => entry.saleId === realSaleId,
+      );
+      if (promo?.wins?.length) {
+        setReceiptSaleId(realSaleId);
+        setPendingPromoWins(promo.wins);
+        setShowPromoModal(true);
+      } else {
+        const receiptText = await getSaleReceipt(realSaleId);
+        setMpesaSuccess(true);
+        setReceipt(receiptText);
+        setShowReceipt(true);
+        if (mpesaSuccessTimeoutRef.current) {
+          clearTimeout(mpesaSuccessTimeoutRef.current);
+        }
+        mpesaSuccessTimeoutRef.current = setTimeout(() => {
+          setMpesaSuccess(false);
+        }, 1500);
+      }
       setMpesaTransaction(null);
       setMpesaStatus(null);
-      setTimeout(() => {
-        resetCart();
-        setShowReceipt(false);
-        setReceipt("");
-        setPromoMessage("");
-        onSaleCompleted?.();
-      }, 3000);
+      if (!promo?.wins?.length) {
+        setTimeout(() => {
+          resetCart();
+          setShowReceipt(false);
+          setReceipt("");
+          setPromoMessage("");
+          onSaleCompleted?.();
+        }, 3000);
+      }
     } catch (err) {
       setError(err.message || "Failed to finalize M-Pesa payment");
     } finally {
@@ -367,6 +420,64 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
     }
   };
 
+  const handlePromoClose = () => {
+    setShowPromoModal(false);
+    setPendingPromoWins([]);
+    setReceiptSaleId(null);
+    if (!receiptSaleId) return;
+    getSaleReceipt(receiptSaleId)
+      .then((receiptText) => {
+        setReceipt(receiptText);
+        setMpesaSuccess(paymentMethod === "mpesa");
+        setShowReceipt(true);
+        setTimeout(() => {
+          resetCart();
+          setShowReceipt(false);
+          setReceipt("");
+          setPromoMessage("");
+          setMpesaSuccess(false);
+          onSaleCompleted?.();
+        }, 3000);
+      })
+      .catch((err) => setError(err.message || "Failed to load receipt"));
+  };
+
+  const handlePromoConfirm = async (decisions, pin) => {
+    const issuedIds = Object.entries(decisions)
+      .filter(([, decision]) => decision === "issued")
+      .map(([id]) => Number(id));
+
+    if (issuedIds.length > 0 && !pin) {
+      throw new Error("PIN required to issue promo wins");
+    }
+
+    if (issuedIds.length > 0) {
+      await Promise.all(
+        issuedIds.map((id) => approvePromoPayout(id, pin)),
+      );
+    }
+
+    setShowPromoModal(false);
+    setPendingPromoWins([]);
+    if (!receiptSaleId) {
+      setReceiptSaleId(null);
+      return;
+    }
+    const receiptText = await getSaleReceipt(receiptSaleId);
+    setReceipt(receiptText);
+    setMpesaSuccess(paymentMethod === "mpesa");
+    setShowReceipt(true);
+    setReceiptSaleId(null);
+    setTimeout(() => {
+      resetCart();
+      setShowReceipt(false);
+      setReceipt("");
+      setPromoMessage("");
+      setMpesaSuccess(false);
+      onSaleCompleted?.();
+    }, 3000);
+  };
+
   const handlePrintReceipt = () => {
     if (!receipt) return;
     const printWindow = window.open("", "_blank", "width=400,height=700");
@@ -400,6 +511,15 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
 
   return (
     <div className="flex flex-col">
+      {showPromoModal && (
+        <PromoWinModal
+          wins={pendingPromoWins}
+          customerName={customer?.name}
+          onClose={handlePromoClose}
+          onConfirm={handlePromoConfirm}
+        />
+      )}
+
       <h2 className="text-textSecondary text-xs font-semibold uppercase tracking-wide mb-4">
         Checkout
       </h2>
@@ -480,6 +600,14 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         </div>
       ) : showReceipt ? (
         <div className="p-4 rounded-2xl bg-surface1 border border-borderColor space-y-3">
+          {mpesaSuccess && (
+            <div className="flex flex-col items-center justify-center gap-2 py-4 text-success">
+              <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success/20">
+                <Checkmark className="w-7 h-7" />
+              </span>
+              <p className="font-semibold text-sm">Payment received</p>
+            </div>
+          )}
           <pre className="text-textPrimary text-xs whitespace-pre-wrap font-mono">
             {receipt}
           </pre>

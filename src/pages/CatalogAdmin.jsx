@@ -30,7 +30,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
     defaults.low_stock_threshold ?? defaults.reorder_threshold ?? "0",
   );
   const [qtyOnHand, setQtyOnHand] = useState(defaults.qty_on_hand ?? "0");
-  const [isActive, setIsActive] = useState(defaults.is_active !== false);
+  const [isActive, setIsActive] = useState(Boolean(defaults.is_active));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -45,7 +45,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
         editing.low_stock_threshold ?? editing.reorder_threshold ?? "0",
       );
       setQtyOnHand(editing.qty_on_hand ?? "0");
-      setIsActive(editing.is_active !== false);
+      setIsActive(Boolean(editing.is_active));
     }
   }, [editing]);
 

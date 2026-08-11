@@ -1,6 +1,20 @@
 import { getAll, putRecord } from "../db/indexedDb";
 import { searchCustomers } from "../api";
 
+function phoneMatchCandidates(phone) {
+  const digits = String(phone).replace(/[^\d]/g, "");
+  if (!digits) return [];
+  let canonical = digits;
+  if (canonical.startsWith("0")) {
+    canonical = `254${canonical.slice(1)}`;
+  } else if (canonical.startsWith("7") || canonical.startsWith("1")) {
+    canonical = `254${canonical}`;
+  }
+  const local = `0${canonical.slice(3)}`;
+  const plus = `+${canonical}`;
+  return [...new Set([canonical, local, plus])];
+}
+
 function toCachedCustomer(customer) {
   return {
     ...customer,
@@ -29,10 +43,12 @@ export async function getCachedCustomers() {
 export async function searchCachedCustomers(query) {
   const all = await getCachedCustomers();
   const q = query.toLowerCase();
+  const phoneQueries = phoneMatchCandidates(query).map((p) => p.toLowerCase());
   return all.filter(
     (c) =>
       (c.name && c.name.toLowerCase().includes(q)) ||
-      (c.phone && c.phone.toLowerCase().includes(q)),
+      (c.phone && phoneQueries.some((p) => c.phone.toLowerCase().includes(p))) ||
+      (c.alt_phone && phoneQueries.some((p) => c.alt_phone.toLowerCase().includes(p))),
   );
 }
 

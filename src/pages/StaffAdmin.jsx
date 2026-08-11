@@ -47,7 +47,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   const [canRedeemPoints, setCanRedeemPoints] = useState(
     !!defaults.can_redeem_points,
   );
-  const [isActive, setIsActive] = useState(defaults.is_active !== false);
+  const [isActive, setIsActive] = useState(Boolean(defaults.is_active));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 

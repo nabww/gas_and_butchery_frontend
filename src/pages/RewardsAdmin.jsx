@@ -1,5 +1,13 @@
 import { Fragment, useEffect, useState } from "react";
-import { createReward, getRewards, updateReward } from "../lib/api";
+import {
+  createReward,
+  getPromoPayouts,
+  getRewards,
+  markPromoPayoutPaid,
+  markPromoPayoutUnfulfilled,
+  updateReward,
+} from "../lib/api";
+import PayoutActionModal from "../components/PayoutActionModal";
 
 const blank = {
   name: "",
@@ -11,15 +19,23 @@ const blank = {
 
 export default function RewardsAdmin() {
   const [rewards, setRewards] = useState([]);
+  const [pendingPrizes, setPendingPrizes] = useState([]);
+  const [selectedPayout, setSelectedPayout] = useState(null);
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("active");
-  const load = () =>
+  const load = () => {
     getRewards(true)
       .then(setRewards)
       .catch((err) => setMessage(err.message));
+    getPromoPayouts()
+      .then((payouts) =>
+        setPendingPrizes(payouts.filter((p) => p.type === "prize")),
+      )
+      .catch((err) => setMessage(err.message));
+  };
   useEffect(() => {
     load();
   }, []);
@@ -60,6 +76,26 @@ export default function RewardsAdmin() {
     setEditingId(null);
     setForm(blank);
     setShowForm(false);
+  };
+  const handleIssuePayout = async () => {
+    if (!selectedPayout) return;
+    try {
+      await markPromoPayoutPaid(selectedPayout.id);
+      setSelectedPayout(null);
+      load();
+    } catch (err) {
+      setMessage(err.message || "Failed to mark reward as fulfilled.");
+    }
+  };
+  const handleUnfulfilledPayout = async () => {
+    if (!selectedPayout) return;
+    try {
+      await markPromoPayoutUnfulfilled(selectedPayout.id);
+      setSelectedPayout(null);
+      load();
+    } catch (err) {
+      setMessage(err.message || "Failed to mark reward as unfulfilled.");
+    }
   };
   const visibleRewards = rewards.filter((r) =>
     statusFilter === "all" ? true : statusFilter === "active" ? r.active : !r.active,
@@ -218,6 +254,38 @@ export default function RewardsAdmin() {
           </table>
         </div>
       </section>
+
+      <section className="mt-8">
+        <h2 className="text-lg font-bold text-textPrimary mb-3">
+          Pending reward payouts
+        </h2>
+        {pendingPrizes.length === 0 && (
+          <p className="text-textMuted text-sm">No pending reward payouts.</p>
+        )}
+        <div className="space-y-2">
+          {pendingPrizes.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setSelectedPayout(p)}
+              className="w-full p-3 rounded-xl bg-surface2 border border-borderColor flex justify-between items-center text-sm text-left hover:border-borderStrong hover:bg-surface3 transition-all">
+              <span className="text-textPrimary">
+                {p.customer_name || p.customer_phone || "Customer"} —{" "}
+                {p.reward_name || "Reward"} (KES{" "}
+                {Number(p.cost_value || 0).toFixed(2)})
+              </span>
+              <span className="text-textSecondary text-xs">Action</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <PayoutActionModal
+        payout={selectedPayout}
+        onClose={() => setSelectedPayout(null)}
+        onIssue={handleIssuePayout}
+        onUnfulfilled={handleUnfulfilledPayout}
+      />
     </main>
   );
 }

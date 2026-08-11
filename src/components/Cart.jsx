@@ -109,6 +109,17 @@ export default function Cart({ canRedeemPoints }) {
   const [rewardLoading, setRewardLoading] = useState(false);
   const [rewardError, setRewardError] = useState("");
 
+  // Reset per-sale UI state when a new sale starts or customer is removed.
+  useEffect(() => {
+    setShowDiscountUI(false);
+    setDiscountInput("");
+    setShowRedeemUI(false);
+    setRedeemInput("");
+    setRedeemError("");
+    setShowRewardUI(false);
+    setRewardError("");
+  }, [saleLocalId, customer?.id]);
+
   useEffect(() => {
     if (canRedeemPoints && customer?.id && navigator.onLine) {
       getCustomerPoints(customer.id)

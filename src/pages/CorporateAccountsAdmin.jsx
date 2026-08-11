@@ -7,6 +7,7 @@ import {
   setCorporatePricing,
   removeCorporatePricing,
   listCorporateInvoices,
+  getInvoiceDetails,
   generateConsolidatedInvoice,
   recordInvoicePayment,
   searchCustomers,
@@ -14,7 +15,9 @@ import {
   getProducts,
   initiateM2pesa,
   getM2pesaStatus,
+  getBusinessConfig,
 } from "../lib/api";
+import Checkmark from "../components/Checkmark";
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount || 0).toLocaleString("en-KE", {
@@ -44,16 +47,84 @@ const formatInvoiceSerial = (invoice) => {
   return `INV-${dateStamp}-${String(invoice?.id || 0).padStart(4, "0")}`;
 };
 
-const buildInvoiceHtml = (invoice, account) => {
+const escapeHtml = (str) =>
+  String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const buildInvoiceHtml = (invoice, account, config = {}) => {
   const serial = formatInvoiceSerial(invoice);
   const customerName = account?.customer_name || "Corporate customer";
   const customerPhone = account?.customer_phone || "—";
+  const businessName = config.business_name || "TeziPOS";
+  const businessTagline = config.business_tagline || "";
+  const logoUrl = config.business_logo_url || "";
+  const logoHtml = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" class="logo" alt="${escapeHtml(businessName)}" />`
+    : `<div class="logo">${escapeHtml(businessName.slice(0, 2).toUpperCase())}</div>`;
   const issueDate = formatInvoiceDate(invoice?.created_at || new Date());
   const dueDate = formatInvoiceDate(
     invoice?.due_date ||
       invoice?.covers_up_to ||
       new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
   );
+
+  const sales = invoice?.sales || [];
+
+  const salesSummaryHtml = (() => {
+    if (invoice?.type !== "consolidated" || sales.length <= 1) return "";
+    const rows = sales
+      .map(
+        (sale) => `
+          <div class="summary-row">
+            <span>S-${sale.id}</span>
+            <span>${formatInvoiceDate(sale.created_at)}</span>
+            <span class="summary-amount">${formatKes(sale.total)}</span>
+          </div>
+        `,
+      )
+      .join("");
+    return `
+      <div class="summary-table">
+        <div class="summary-header">
+          <span>Sale</span>
+          <span>Date</span>
+          <span class="summary-amount">Amount</span>
+        </div>
+        ${rows}
+      </div>
+    `;
+  })();
+
+  const itemsHtml = (() => {
+    const allItems = sales.flatMap((sale) =>
+      (sale.items || []).map((item) => ({ ...item, saleId: sale.id })),
+    );
+    if (allItems.length === 0) {
+      return '<p class="value">No line items available.</p>';
+    }
+    const rows = allItems
+      .map(
+        (item) => `
+          <div class="items-row">
+            <span class="items-sale">S-${item.saleId}</span>
+            <span class="items-desc">${escapeHtml(item.product_name || item.cylinder_brand || "Unknown")}</span>
+            <span class="items-qty text-center">${Number(item.quantity || 0).toFixed(2)}</span>
+            <span class="items-amount">${formatKes(item.line_total)}</span>
+          </div>
+        `,
+      )
+      .join("");
+    return `
+      <div class="items-table">
+        <div class="items-header">
+          <span>Sale</span>
+          <span>Description</span>
+          <span class="items-qty text-center">Qty</span>
+          <span class="items-amount">Amount</span>
+        </div>
+        ${rows}
+      </div>
+    `;
+  })();
 
   return `
     <!doctype html>
@@ -104,6 +175,7 @@ const buildInvoiceHtml = (invoice, account) => {
             color: #374151;
             font-size: 12px;
             text-transform: uppercase;
+            object-fit: contain;
           }
           .business-name {
             margin: 0;
@@ -179,6 +251,77 @@ const buildInvoiceHtml = (invoice, account) => {
             font-size: 18px;
             font-weight: 700;
           }
+          .items-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 18px;
+            font-size: 13px;
+          }
+          .items-header {
+            display: grid;
+            grid-template-columns: 0.6fr 2fr 0.5fr 0.8fr;
+            background: #f3f4f6;
+            padding: 10px 14px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            font-weight: 600;
+          }
+          .items-row {
+            display: grid;
+            grid-template-columns: 0.6fr 2fr 0.5fr 0.8fr;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff;
+          }
+          .items-row:last-child {
+            border-bottom: none;
+          }
+          .items-sale {
+            color: #6b7280;
+            font-size: 11px;
+          }
+          .items-amount {
+            text-align: right;
+            font-weight: 600;
+          }
+          .items-qty {
+            text-align: center;
+          }
+          .summary-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 18px;
+            font-size: 13px;
+          }
+          .summary-header {
+            display: grid;
+            grid-template-columns: 0.6fr 1.4fr 0.8fr;
+            background: #f3f4f6;
+            padding: 10px 14px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7280;
+            font-weight: 600;
+          }
+          .summary-row {
+            display: grid;
+            grid-template-columns: 0.6fr 1.4fr 0.8fr;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff;
+          }
+          .summary-row:last-child {
+            border-bottom: none;
+          }
+          .summary-amount {
+            text-align: right;
+            font-weight: 600;
+          }
           .footer {
             margin-top: 28px;
             font-size: 12px;
@@ -204,10 +347,10 @@ const buildInvoiceHtml = (invoice, account) => {
         <div class="invoice">
           <div class="header">
             <div class="brand">
-              <div class="logo">Logo</div>
+              ${logoHtml}
               <div>
-                <h1 class="business-name">TeziPOS</h1>
-                <p class="business-meta">Butchery & Gas · Corporate Accounts</p>
+                <h1 class="business-name">${escapeHtml(businessName)}</h1>
+                <p class="business-meta">${escapeHtml(businessTagline)}</p>
               </div>
             </div>
             <div class="invoice-meta">
@@ -239,6 +382,12 @@ const buildInvoiceHtml = (invoice, account) => {
               <div class="value">${dueDate}</div>
             </div>
           </div>
+
+          ${salesSummaryHtml}
+
+          <p class="label" style="margin: 18px 0 8px;">Detailed line items</p>
+
+          ${itemsHtml}
 
           <div class="totals">
             <div class="totals-row">
@@ -497,7 +646,7 @@ function RegisterForm({ onRegistered }) {
   );
 }
 
-function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit }) {
+function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [mpesaPhone, setMpesaPhone] = useState("");
@@ -609,6 +758,23 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit }) {
           )}
         </div>
 
+        {status && (
+          <p className={`mt-4 text-sm rounded-lg px-3 py-2 flex items-center gap-2 ${
+            status.toLowerCase().includes("received") ||
+            status.toLowerCase().includes("confirmed")
+              ? "bg-success/10 text-success border border-success/30"
+              : "bg-surface2 text-textSecondary border border-borderColor"
+          }`}>
+            {(status.toLowerCase().includes("received") ||
+              status.toLowerCase().includes("confirmed")) && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-success text-onPrimary">
+                <Checkmark className="w-3 h-3" />
+              </span>
+            )}
+            {status}
+          </p>
+        )}
+
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
@@ -626,7 +792,7 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit }) {
   );
 }
 
-function AccountDetail({ account, onUpdated, onClose }) {
+function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
   const [creditLimit, setCreditLimit] = useState(account.credit_limit);
   const [savingLimit, setSavingLimit] = useState(false);
   const [pricing, setPricing] = useState([]);
@@ -642,6 +808,7 @@ function AccountDetail({ account, onUpdated, onClose }) {
     amountDue: 0,
   });
   const [message, setMessage] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
   const mpesaPollRef = useRef(null);
 
   const messageTone = (() => {
@@ -678,6 +845,20 @@ function AccountDetail({ account, onUpdated, onClose }) {
   };
 
   useEffect(() => () => stopMpesaPolling(), []);
+
+  useEffect(() => {
+    const id = selectedInvoice?.id;
+    if (!id || selectedInvoice.sales) return;
+    setMessage("");
+    getInvoiceDetails(id)
+      .then((details) =>
+        setSelectedInvoice({
+          ...details.invoice,
+          sales: details.sales,
+        }),
+      )
+      .catch((err) => setMessage(err.message || "Failed to load invoice details"));
+  }, [selectedInvoice?.id]);
 
   const load = () => {
     getCorporatePricing(account.id)
@@ -760,11 +941,11 @@ function AccountDetail({ account, onUpdated, onClose }) {
 
     if (method === "mpesa") {
       if (!phone || !phone.trim()) {
-        setMessage("Phone number is required for M-Pesa payments.");
+        setPaymentStatus("Phone number is required for M-Pesa payments.");
         return;
       }
       try {
-        setMessage("Sending M-Pesa STK push...");
+        setPaymentStatus("Sending M-Pesa STK push...");
         const transaction = await initiateM2pesa(phone.trim(), amount);
         const mpesaTransactionId = transaction?.mpesa_transaction_id;
         if (!mpesaTransactionId) {
@@ -787,10 +968,14 @@ function AccountDetail({ account, onUpdated, onClose }) {
                 await recordInvoicePayment(invoiceId, amount, "mpesa");
                 load();
                 onUpdated();
-                setMessage("M-Pesa payment confirmed and recorded.");
-                setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+                setPaymentStatus("Payment received");
+                setTimeout(() => {
+                  setPaymentStatus("");
+                  setMessage("M-Pesa payment confirmed and recorded.");
+                  setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+                }, 1500);
               } else {
-                setMessage(
+                setPaymentStatus(
                   status?.resultDesc ||
                     "M-Pesa payment was not completed. Please try again.",
                 );
@@ -800,20 +985,20 @@ function AccountDetail({ account, onUpdated, onClose }) {
 
             if (pollCount >= maxPolls) {
               stopMpesaPolling();
-              setMessage(
+              setPaymentStatus(
                 "M-Pesa payment is still pending. Please check again.",
               );
             }
           } catch (err) {
             stopMpesaPolling();
-            setMessage(err.message || "M-Pesa status check failed.");
+            setPaymentStatus(err.message || "M-Pesa status check failed.");
           }
         }, 3000);
 
-        setMessage("STK push sent. Waiting for customer confirmation...");
+        setPaymentStatus("STK push sent. Waiting for customer confirmation...");
         return;
       } catch (err) {
-        setMessage(err.message || "Failed to send M-Pesa request");
+        setPaymentStatus(err.message || "Failed to send M-Pesa request");
         return;
       }
     }
@@ -822,10 +1007,14 @@ function AccountDetail({ account, onUpdated, onClose }) {
       await recordInvoicePayment(invoiceId, amount, method);
       load();
       onUpdated();
-      setMessage("Payment recorded.");
-      setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+      setPaymentStatus("Payment received");
+      setTimeout(() => {
+        setPaymentStatus("");
+        setMessage("Payment recorded.");
+        setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+      }, 1500);
     } catch (err) {
-      setMessage(err.message || "Failed to record payment");
+      setPaymentStatus(err.message || "Failed to record payment");
     }
   };
 
@@ -834,14 +1023,26 @@ function AccountDetail({ account, onUpdated, onClose }) {
   const availableCredit =
     parseFloat(account.credit_limit) - parseFloat(account.current_balance);
 
-  const printInvoice = (invoice) => {
+  const printInvoice = async (invoice) => {
     const printWindow = window.open("", "_blank", "width=1000,height=900");
     if (!printWindow) {
       setMessage("Please allow pop-ups to download the invoice as PDF.");
       return;
     }
 
-    const invoiceHtml = buildInvoiceHtml(invoice, account);
+    let detailed = invoice;
+    if (!invoice.sales) {
+      try {
+        const details = await getInvoiceDetails(invoice.id);
+        detailed = { ...details.invoice, sales: details.sales };
+      } catch (err) {
+        printWindow.close();
+        setMessage(err.message || "Failed to load invoice details");
+        return;
+      }
+    }
+
+    const invoiceHtml = buildInvoiceHtml(detailed, account, businessConfig);
     printWindow.document.write(invoiceHtml);
     printWindow.document.close();
     printWindow.focus();
@@ -855,7 +1056,15 @@ function AccountDetail({ account, onUpdated, onClose }) {
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
             Payment status
           </p>
-          <p className="mt-1 text-sm font-medium">{message}</p>
+          <p className="mt-1 text-sm font-medium flex items-center gap-2">
+            {(message.toLowerCase().includes("confirmed") ||
+              message.toLowerCase().includes("recorded")) && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-success text-onPrimary">
+                <Checkmark className="w-3 h-3" />
+              </span>
+            )}
+            {message}
+          </p>
         </div>
       )}
 
@@ -863,27 +1072,39 @@ function AccountDetail({ account, onUpdated, onClose }) {
         open={paymentModal.open}
         invoiceId={paymentModal.invoiceId}
         amountDue={paymentModal.amountDue}
-        onClose={() =>
-          setPaymentModal({ open: false, invoiceId: null, amountDue: 0 })
-        }
+        status={paymentStatus}
+        onClose={() => {
+          setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
+          setPaymentStatus("");
+        }}
         onSubmit={({ invoiceId, amount, method, phone }) =>
           payInvoice(invoiceId, paymentModal.amountDue, method, amount, phone)
         }
       />
 
       {selectedInvoice && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl max-h-[85vh] rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-200 overflow-y-auto my-8">
             <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl border border-slate-300 bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 uppercase">
-                    Logo
-                  </div>
+                  {businessConfig.business_logo_url ? (
+                    <img
+                      src={businessConfig.business_logo_url}
+                      alt={businessConfig.business_name || "TeziPOS"}
+                      className="w-12 h-12 rounded-xl border border-slate-300 bg-slate-200 object-contain"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl border border-slate-300 bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700 uppercase">
+                      {(businessConfig.business_name || "TeziPOSe").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
-                    <p className="text-xl font-bold">TeziPOS</p>
+                    <p className="text-xl font-bold">
+                      {businessConfig.business_name || "TeziPOS"}
+                    </p>
                     <p className="text-[11px] text-slate-500 uppercase tracking-[0.12em]">
-                      Butchery & Gas · Corporate Accounts
+                      {businessConfig.business_tagline || "Corporate Accounts"}
                     </p>
                   </div>
                 </div>
@@ -930,21 +1151,97 @@ function AccountDetail({ account, onUpdated, onClose }) {
                 </div>
               </div>
 
+              {selectedInvoice.type === "consolidated" &&
+                (selectedInvoice.sales || []).length > 1 && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="grid grid-cols-[0.8fr_1.4fr_0.8fr] bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 px-3 py-2">
+                      <span>Sale</span>
+                      <span>Date</span>
+                      <span className="text-right">Amount</span>
+                    </div>
+                    {(selectedInvoice.sales || []).map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="grid grid-cols-[0.8fr_1.4fr_0.8fr] items-center px-3 py-3 text-sm border-t border-slate-200">
+                        <span className="text-slate-600 text-xs">S-{sale.id}</span>
+                        <span className="text-slate-700">
+                          {formatInvoiceDate(sale.created_at)}
+                        </span>
+                        <span className="text-right font-semibold text-slate-900">
+                          {formatKes(sale.total)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              {selectedInvoice.type === "consolidated" &&
+                (() => {
+                  const rolled = invoices.filter(
+                    (inv) =>
+                      inv.consolidated_invoice_id === selectedInvoice.id,
+                  );
+                  if (rolled.length === 0) return null;
+                  return (
+                    <div className="rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="grid grid-cols-[0.8fr_1.4fr_0.8fr] bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 px-3 py-2">
+                        <span>Invoice</span>
+                        <span>Date</span>
+                        <span className="text-right">Total</span>
+                      </div>
+                      {rolled.map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="grid grid-cols-[0.8fr_1.4fr_0.8fr] items-center px-3 py-3 text-sm border-t border-slate-200">
+                          <span className="text-slate-600 text-xs">
+                            #{formatInvoiceSerial(inv)}
+                          </span>
+                          <span className="text-slate-700">
+                            {formatInvoiceDate(inv.created_at)}
+                          </span>
+                          <span className="text-right font-semibold text-slate-900">
+                            {formatKes(inv.total)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Detailed line items
+              </p>
+
               <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-[1.5fr_0.7fr_0.8fr] bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 px-3 py-2">
+                <div className="grid grid-cols-[0.5fr_1.4fr_0.6fr_0.8fr] bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 px-3 py-2">
+                  <span>Sale</span>
                   <span>Description</span>
                   <span className="text-center">Qty</span>
                   <span className="text-right">Amount</span>
                 </div>
-                <div className="grid grid-cols-[1.5fr_0.7fr_0.8fr] items-center px-3 py-3 text-sm border-t border-slate-200">
-                  <span className="font-medium text-slate-900">
-                    Corporate account invoice
-                  </span>
-                  <span className="text-center text-slate-700">1</span>
-                  <span className="text-right font-semibold text-slate-900">
-                    {formatKes(selectedInvoice.total)}
-                  </span>
-                </div>
+                {(selectedInvoice.sales || []).length === 0 && (
+                  <div className="px-3 py-3 text-sm text-slate-600 border-t border-slate-200">
+                    No line items available.
+                  </div>
+                )}
+                {(selectedInvoice.sales || []).flatMap((sale) =>
+                  (sale.items || []).map((item, idx) => (
+                    <div
+                      key={`${sale.id}-${item.id || idx}`}
+                      className="grid grid-cols-[0.5fr_1.4fr_0.6fr_0.8fr] items-center px-3 py-3 text-sm border-t border-slate-200">
+                      <span className="text-slate-600 text-xs">S-{sale.id}</span>
+                      <span className="font-medium text-slate-900">
+                        {item.product_name || item.cylinder_brand || "Unknown"}
+                      </span>
+                      <span className="text-center text-slate-700">
+                        {Number(item.quantity || 0).toFixed(2)}
+                      </span>
+                      <span className="text-right font-semibold text-slate-900">
+                        {formatKes(item.line_total)}
+                      </span>
+                    </div>
+                  )),
+                )}
               </div>
 
               <div className="ml-auto w-full max-w-xs space-y-2 text-sm">
@@ -974,11 +1271,18 @@ function AccountDetail({ account, onUpdated, onClose }) {
                 <p className="font-semibold uppercase tracking-[0.12em] text-slate-600 mb-1">
                   Notes
                 </p>
-                <p>
-                  Thank you for your business. This invoice is for the corporate
-                  account statement and is intended for PDF export and record
-                  keeping.
-                </p>
+                {selectedInvoice.consolidated_invoice_id ? (
+                  <p>
+                    This invoice was rolled into consolidated invoice #
+                    {selectedInvoice.consolidated_invoice_id}.
+                  </p>
+                ) : (
+                  <p>
+                    Thank you for your business. This invoice is for the corporate
+                    account statement and is intended for PDF export and record
+                    keeping.
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -1136,7 +1440,9 @@ function AccountDetail({ account, onUpdated, onClose }) {
                       ? "text-success"
                       : inv.status === "partial"
                         ? "text-warning"
-                        : "text-danger"
+                        : inv.status === "consolidated"
+                          ? "text-textMuted"
+                          : "text-danger"
                   }`}>
                   {inv.status}
                 </span>
@@ -1145,12 +1451,14 @@ function AccountDetail({ account, onUpdated, onClose }) {
                   className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
                   View invoice
                 </button>
-                <button
-                  onClick={() => printInvoice(inv)}
-                  className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
-                  PDF
-                </button>
-                {inv.status !== "paid" && (
+                {inv.status !== "consolidated" && (
+                  <button
+                    onClick={() => printInvoice(inv)}
+                    className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                    PDF
+                  </button>
+                )}
+                {inv.status !== "paid" && inv.status !== "consolidated" && (
                   <button
                     onClick={() =>
                       setPaymentModal({
@@ -1177,6 +1485,11 @@ export default function CorporateAccountsAdmin() {
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [error, setError] = useState("");
+  const [businessConfig, setBusinessConfig] = useState({
+    business_name: "TeziPOS",
+    business_tagline: "",
+    business_logo_url: "",
+  });
 
   const load = () =>
     listCorporateAccounts()
@@ -1185,6 +1498,13 @@ export default function CorporateAccountsAdmin() {
 
   useEffect(() => {
     load();
+    getBusinessConfig()
+      .then(setBusinessConfig)
+      .catch(() => setBusinessConfig({
+        business_name: "TeziPOS",
+        business_tagline: "",
+        business_logo_url: "",
+      }));
   }, []);
 
   return (
@@ -1259,6 +1579,7 @@ export default function CorporateAccountsAdmin() {
                 account={account}
                 onUpdated={load}
                 onClose={() => setExpandedId(null)}
+                businessConfig={businessConfig}
               />
             )}
           </div>
