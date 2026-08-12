@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../lib/useTheme';
 import { useActiveLocation } from '../contexts/LocationContext';
 
+function HamburgerIcon({ open }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1={open ? 3 : 2} y1="5" x2={open ? 17 : 18} y2={open ? 15 : 5} />
+      <line x1="2" y1="10" x2="18" y2="10" style={{ opacity: open ? 0 : 1, transition: 'opacity 0.15s' }} />
+      <line x1={open ? 3 : 2} y1="15" x2={open ? 17 : 18} y2={open ? 5 : 15} />
+    </svg>
+  );
+}
+
 // Nav items per role, per build plan Section 5b. The nav only renders
 // what a person can access -- no greyed-out items cluttering a screen
 // built for speed.
@@ -120,6 +130,27 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
   );
 }
 
+function NavItem({ item, currentPath, onClick, mobile }) {
+  const active = currentPath === item.path;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: 'none',
+        background: active ? 'var(--bg-accent)' : 'transparent',
+        color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
+        padding: '8px 12px',
+        fontSize: mobile ? 14 : 13,
+        textAlign: mobile ? 'left' : 'center',
+        width: mobile ? '100%' : 'auto',
+        borderRadius: 6,
+      }}
+    >
+      {item.label}
+    </button>
+  );
+}
+
 export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
   const items = NAV_BY_ROLE[staff.role] || [];
   const showQuickSell = staff.role === 'admin' || staff.role === 'supervisor';
@@ -127,6 +158,12 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
     staff.role === 'admin' || (staff.role === 'supervisor' && staff.canSwitchLocation);
   const { theme, toggleTheme } = useTheme();
   const { locations, activeLocationId, setActiveLocationId } = useActiveLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleNav = (path) => {
+    setMobileOpen(false);
+    onNavigate(path);
+  };
 
   return (
     <nav
@@ -145,67 +182,152 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         TeziPOS
       </span>
 
-      {items.map((item) => (
-        <button
-          key={item.path}
-          onClick={() => onNavigate(item.path)}
-          style={{
-            border: 'none',
-            background: currentPath === item.path ? 'var(--bg-accent)' : 'transparent',
-            color: currentPath === item.path ? 'var(--text-accent)' : 'var(--text-secondary)',
-            padding: '6px 12px',
-            fontSize: 13,
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {/* Desktop nav links */}
+      <div className="hidden md:flex items-center gap-1">
+        {items.map((item) => (
+          <NavItem
+            key={item.path}
+            item={item}
+            currentPath={currentPath}
+            onClick={() => handleNav(item.path)}
+            mobile={false}
+          />
+        ))}
 
-      {showLocationSwitcher && locations.length > 0 && (
-        <LocationSwitcher
-          locations={locations}
-          activeLocationId={activeLocationId}
-          onChange={setActiveLocationId}
-        />
-      )}
+        {showLocationSwitcher && locations.length > 0 && (
+          <LocationSwitcher
+            locations={locations}
+            activeLocationId={activeLocationId}
+            onChange={setActiveLocationId}
+          />
+        )}
+      </div>
 
       <div style={{ flex: 1 }} />
 
-      {/* Quick "Sell" access -- text-only, always visible, lets an admin/
-          supervisor jump straight to the till without leaving their
-          normal dashboard-first flow (build plan Section 5b). */}
-      {showQuickSell && currentPath !== '/till' && (
+      {/* Desktop right controls */}
+      <div className="hidden md:flex items-center gap-3">
+        {showQuickSell && currentPath !== '/till' && (
+          <button
+            onClick={() => handleNav('/till')}
+            style={{
+              border: 'none',
+              background: 'none',
+              color: 'var(--text-accent)',
+              fontSize: 13,
+              textDecoration: 'underline',
+              cursor: 'pointer',
+            }}
+          >
+            Sell
+          </button>
+        )}
         <button
-          onClick={() => onNavigate('/till')}
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           style={{
             border: 'none',
             background: 'none',
-            color: 'var(--text-accent)',
-            fontSize: 13,
-            textDecoration: 'underline',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
           }}
         >
-          Sell
+          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
         </button>
-      )}
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
+        <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+          Sign out
+        </button>
+      </div>
 
+      {/* Mobile hamburger toggle */}
       <button
-        onClick={toggleTheme}
-        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        type="button"
+        onClick={() => setMobileOpen((v) => !v)}
+        className="md:hidden"
         style={{
           border: 'none',
-          background: 'none',
-          fontSize: 12,
-          color: 'var(--text-muted)',
+          background: 'transparent',
+          color: 'var(--text-primary)',
+          padding: 6,
+          borderRadius: 6,
           cursor: 'pointer',
         }}
+        aria-label="Toggle navigation"
       >
-        {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        <HamburgerIcon open={mobileOpen} />
       </button>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
-      <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-        Sign out
-      </button>
+
+      {/* Mobile menu overlay */}
+      {mobileOpen && (
+        <div
+          className="md:hidden"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            background: 'var(--surface-2)',
+            borderBottom: '0.5px solid var(--border)',
+            padding: '12px 16px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            zIndex: 99,
+          }}
+        >
+          <div className="space-y-2 mb-4">
+            {items.map((item) => (
+              <NavItem
+                key={item.path}
+                item={item}
+                currentPath={currentPath}
+                onClick={() => handleNav(item.path)}
+                mobile
+              />
+            ))}
+          </div>
+
+          {showLocationSwitcher && locations.length > 0 && (
+            <div className="pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
+              <LocationSwitcher
+                locations={locations}
+                activeLocationId={activeLocationId}
+                onChange={(id) => {
+                  setMobileOpen(false);
+                  setActiveLocationId(id);
+                }}
+              />
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-4">
+            {showQuickSell && currentPath !== '/till' && (
+              <button
+                onClick={() => handleNav('/till')}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--text-accent)',
+                  fontSize: 13,
+                  textDecoration: 'underline',
+                }}
+              >
+                Sell
+              </button>
+            )}
+            <button
+              onClick={toggleTheme}
+              style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}
+            >
+              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
+            <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

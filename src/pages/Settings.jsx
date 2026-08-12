@@ -5,6 +5,13 @@ import {
   uploadBusinessLogo,
   getLoyaltyConfig,
   updateLoyaltyConfig,
+  listLocations,
+  createLocation,
+  updateLocation,
+  getLocationMpesaConfig,
+  saveLocationMpesaConfig,
+  resetLocationMpesaConfig,
+  getStoredStaff,
 } from "../lib/api";
 
 const formatKes = (amount) =>
@@ -357,6 +364,339 @@ function LoyaltySettingsSection({ message, setMessage }) {
   );
 }
 
+function ShopsSettingsSection({ setMessage }) {
+  const staff = getStoredStaff();
+  const isAdmin = staff?.role === "admin";
+
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ name: "", address: "", is_active: true });
+  const [saving, setSaving] = useState(false);
+  const [mpesaForm, setMpesaForm] = useState({
+    environment: "sandbox",
+    shortcode: "",
+    consumerKey: "",
+    consumerSecret: "",
+    passkey: "",
+  });
+  const [selectedMpesaLocationId, setSelectedMpesaLocationId] = useState(null);
+  const [mpesaLoading, setMpesaLoading] = useState(false);
+
+  const loadLocations = async () => {
+    setLoading(true);
+    try {
+      const rows = await listLocations();
+      setLocations(rows);
+    } catch (err) {
+      setMessage(err.message || "Failed to load shops.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLocations();
+  }, []);
+
+  const startAdd = () => {
+    setEditingId("new");
+    setForm({ name: "", address: "", is_active: true });
+  };
+
+  const startEdit = (loc) => {
+    setEditingId(loc.id);
+    setForm({ name: loc.name || "", address: loc.address || "", is_active: !!loc.is_active });
+  };
+
+  const cancel = () => {
+    setEditingId(null);
+    setForm({ name: "", address: "", is_active: true });
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) {
+      setMessage("Only admins can manage shops.");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      if (editingId === "new") {
+        await createLocation(form);
+        setMessage("Shop created. Refresh the page to see it in the shop switcher.");
+      } else {
+        await updateLocation(editingId, form);
+        setMessage("Shop updated.");
+      }
+      await loadLocations();
+      cancel();
+    } catch (err) {
+      setMessage(err.message || "Failed to save shop.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadMpesaConfig = async (locationId) => {
+    setSelectedMpesaLocationId(locationId);
+    setMpesaLoading(true);
+    setMessage("");
+    try {
+      const cfg = await getLocationMpesaConfig(locationId);
+      setMpesaForm({
+        environment: cfg.environment || "sandbox",
+        shortcode: cfg.shortcode || "",
+        consumerKey: cfg.consumerKey || "",
+        consumerSecret: cfg.consumerSecret || "",
+        passkey: cfg.passkey || "",
+      });
+    } catch (err) {
+      setMessage(err.message || "Failed to load M-Pesa config.");
+    } finally {
+      setMpesaLoading(false);
+    }
+  };
+
+  const saveMpesaConfig = async (e) => {
+    e.preventDefault();
+    if (!isAdmin || !selectedMpesaLocationId) return;
+    setMpesaLoading(true);
+    setMessage("");
+    try {
+      await saveLocationMpesaConfig(selectedMpesaLocationId, mpesaForm);
+      setMessage("M-Pesa config saved.");
+    } catch (err) {
+      setMessage(err.message || "Failed to save M-Pesa config.");
+    } finally {
+      setMpesaLoading(false);
+    }
+  };
+
+  const clearMpesaConfig = async () => {
+    if (!isAdmin || !selectedMpesaLocationId) return;
+    if (!confirm("Remove this shop's dedicated M-Pesa config and fall back to global .env settings?")) return;
+    setMpesaLoading(true);
+    setMessage("");
+    try {
+      await resetLocationMpesaConfig(selectedMpesaLocationId);
+      setMpesaForm({
+        environment: "sandbox",
+        shortcode: "",
+        consumerKey: "",
+        consumerSecret: "",
+        passkey: "",
+      });
+      setMessage("M-Pesa config reset to global fallback.");
+    } catch (err) {
+      setMessage(err.message || "Failed to reset M-Pesa config.");
+    } finally {
+      setMpesaLoading(false);
+    }
+  };
+
+  const closeMpesaConfig = () => {
+    setSelectedMpesaLocationId(null);
+    setMpesaForm({
+      environment: "sandbox",
+      shortcode: "",
+      consumerKey: "",
+      consumerSecret: "",
+      passkey: "",
+    });
+  };
+
+  const input =
+    "w-full mt-2 px-3 py-2 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm focus:outline-none focus:border-primary";
+  const label = "text-textPrimary font-semibold text-sm";
+
+  if (loading) return <div className="text-textSecondary">Loading shops…</div>;
+
+  return (
+    <section className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-textPrimary font-bold">Shops / Branches</h2>
+        {isAdmin && (
+          <button
+            onClick={startAdd}
+            className="px-3 py-1.5 rounded-lg bg-primary text-onPrimary text-sm font-semibold">
+            + Add shop
+          </button>
+        )}
+      </div>
+
+      {editingId && (
+        <form onSubmit={save} className="rounded-xl bg-surface1 border border-borderColor p-4 space-y-4">
+          <h3 className="text-textPrimary font-semibold text-sm">
+            {editingId === "new" ? "Add shop" : "Edit shop"}
+          </h3>
+          <div>
+            <label className={label}>Name</label>
+            <input
+              className={input}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+              disabled={!isAdmin || saving}
+            />
+          </div>
+          <div>
+            <label className={label}>Address</label>
+            <input
+              className={input}
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              disabled={!isAdmin || saving}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-textPrimary text-sm">
+            <input
+              type="checkbox"
+              checked={form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+              disabled={!isAdmin || saving}
+            />
+            Active
+          </label>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <button
+                type="submit"
+                disabled={saving || !form.name.trim()}
+                className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+                {saving ? "Saving…" : "Save shop"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={cancel}
+              className="px-4 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="space-y-3">
+        {locations.map((loc) => (
+          <div key={loc.id} className="rounded-xl bg-surface1 border border-borderColor p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-textPrimary font-semibold">{loc.name}</p>
+                <p className="text-textSecondary text-sm">{loc.address || "No address"}</p>
+                <span
+                  className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${
+                    loc.is_active ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                  }`}>
+                  {loc.is_active ? "Active" : "Inactive"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => startEdit(loc)}
+                    className="px-3 py-1 rounded-lg border border-borderColor text-textSecondary text-xs hover:bg-surface2">
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={() => loadMpesaConfig(loc.id)}
+                  className="px-3 py-1 rounded-lg border border-borderColor text-primary text-xs hover:bg-surface2">
+                  M-Pesa config
+                </button>
+              </div>
+            </div>
+
+            {selectedMpesaLocationId === loc.id && (
+              <form onSubmit={saveMpesaConfig} className="mt-4 pt-4 border-t border-borderColor space-y-4">
+                <p className="text-textPrimary font-semibold text-sm">M-Pesa config for {loc.name}</p>
+                <p className="text-textMuted text-xs">
+                  Leave fields blank to use the global .env M-Pesa configuration.
+                </p>
+                <div>
+                  <label className={label}>Environment</label>
+                  <select
+                    className={input}
+                    value={mpesaForm.environment}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, environment: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}>
+                    <option value="sandbox">Sandbox</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={label}>Shortcode</label>
+                  <input
+                    className={input}
+                    value={mpesaForm.shortcode}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, shortcode: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Consumer Key</label>
+                  <input
+                    className={input}
+                    type="password"
+                    value={mpesaForm.consumerKey}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, consumerKey: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Consumer Secret</label>
+                  <input
+                    className={input}
+                    type="password"
+                    value={mpesaForm.consumerSecret}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, consumerSecret: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Passkey</label>
+                  <input
+                    className={input}
+                    type="password"
+                    value={mpesaForm.passkey}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, passkey: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}
+                  />
+                </div>
+                {isAdmin && (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      disabled={mpesaLoading}
+                      className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+                      {mpesaLoading ? "Saving…" : "Save M-Pesa config"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearMpesaConfig}
+                      disabled={mpesaLoading}
+                      className="px-4 py-2 rounded-lg border border-borderColor bg-surface2 text-danger text-sm font-semibold">
+                      Reset to global
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeMpesaConfig}
+                      disabled={mpesaLoading}
+                      className="px-4 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Settings() {
   const [tab, setTab] = useState("business");
   const [message, setMessage] = useState("");
@@ -381,29 +721,29 @@ export default function Settings() {
         </p>
       )}
 
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setTab("business")}
-          className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-            tab === "business"
-              ? "bg-primary text-onPrimary"
-              : "border border-borderColor bg-surface2 text-textSecondary hover:bg-surface3 hover:text-textPrimary"
-          }`}>
-          Business
-        </button>
-        <button
-          onClick={() => setTab("loyalty")}
-          className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-            tab === "loyalty"
-              ? "bg-primary text-onPrimary"
-              : "border border-borderColor bg-surface2 text-textSecondary hover:bg-surface3 hover:text-textPrimary"
-          }`}>
-          Loyalty
-        </button>
+      <div className="flex flex-wrap gap-2 mb-6">
+        {[
+          { key: "business", label: "Business" },
+          { key: "shops", label: "Shops" },
+          { key: "loyalty", label: "Loyalty" },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+              tab === key
+                ? "bg-primary text-onPrimary"
+                : "border border-borderColor bg-surface2 text-textSecondary hover:bg-surface3 hover:text-textPrimary"
+            }`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === "business" ? (
         <BusinessConfigSection message={message} setMessage={setMessage} />
+      ) : tab === "shops" ? (
+        <ShopsSettingsSection message={message} setMessage={setMessage} />
       ) : (
         <LoyaltySettingsSection message={message} setMessage={setMessage} />
       )}

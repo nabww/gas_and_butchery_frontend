@@ -11,6 +11,8 @@ import CustomersAdmin from "./pages/CustomersAdmin";
 import StaffAdmin from "./pages/StaffAdmin";
 import Reports from "./pages/Reports";
 import Overrides from "./pages/Overrides";
+import Dashboard from "./pages/Dashboard";
+import Insights from "./pages/Insights";
 
 import { getStoredStaff, logout } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
@@ -125,6 +127,10 @@ export default function App() {
           <Reports />
         ) : currentPath === "/overrides" ? (
           <Overrides />
+        ) : currentPath === "/dashboard" ? (
+          <Dashboard onNavigate={setPath} />
+        ) : currentPath === "/insights" ? (
+          <Insights onNavigate={setPath} />
         ) : (
           <Placeholder name={currentPath.replace("/", "") || "till"} />
         )}

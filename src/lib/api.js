@@ -293,6 +293,37 @@ export async function listLocations() {
   return apiFetch("/staff/locations");
 }
 
+export async function createLocation(payload) {
+  return apiFetch("/staff/locations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateLocation(locationId, payload) {
+  return apiFetch(`/staff/locations/${locationId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getLocationMpesaConfig(locationId) {
+  return apiFetch(`/staff/locations/${locationId}/mpesa-config`);
+}
+
+export async function saveLocationMpesaConfig(locationId, payload) {
+  return apiFetch(`/staff/locations/${locationId}/mpesa-config`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetLocationMpesaConfig(locationId) {
+  return apiFetch(`/staff/locations/${locationId}/mpesa-config`, {
+    method: "DELETE",
+  });
+}
+
 export async function listStaff() {
   return apiFetch("/staff");
 }
@@ -632,6 +663,19 @@ export async function getTopCustomersReport(startDate, endDate, locationId) {
 
 export async function getArAgingReport() {
   return apiFetch("/reports/ar-aging");
+}
+
+export async function getDailyTrend(days = 14, locationId) {
+  const params = new URLSearchParams();
+  params.set("days", String(days));
+  if (locationId) params.set("location_id", locationId);
+  return apiFetch(`/reports/daily-trend?${params.toString()}`);
+}
+
+export async function getInsights(locationId) {
+  const params = new URLSearchParams();
+  if (locationId) params.set("location_id", locationId);
+  return apiFetch(`/reports/insights?${params.toString()}`);
 }
 
 // ========== SYNC API ==========
