@@ -503,9 +503,9 @@ export default function Reports() {
       amount: Number(data.total || 0).toFixed(2),
     }));
     rows.push(
-      { category: "Expense", item: "Cashback payouts", count: "—", amount: Number(expenses?.promoCashback || 0).toFixed(2) },
-      { category: "Expense", item: "Prize payouts", count: "—", amount: Number(expenses?.promoPrizes || 0).toFixed(2) },
-      { category: "Expense", item: "Reward redemptions", count: "—", amount: Number(expenses?.rewards || 0).toFixed(2) },
+      { category: "Expense", item: "Cashback payouts", count: Number(expenses?.promoCashbackCount || 0), amount: Number(expenses?.promoCashback || 0).toFixed(2) },
+      { category: "Expense", item: "Prize payouts", count: Number(expenses?.promoPrizesCount || 0), amount: Number(expenses?.promoPrizes || 0).toFixed(2) },
+      { category: "Expense", item: "Reward redemptions", count: Number(expenses?.rewardsCount || 0), amount: Number(expenses?.rewards || 0).toFixed(2) },
     );
 
     return (
@@ -534,7 +534,34 @@ export default function Reports() {
           <StatBox label="Total income" value={`KES ${Number(income?.total || 0).toFixed(2)}`} />
           <StatBox label="Total expenses" value={`KES ${Number(expenses?.total || 0).toFixed(2)}`} />
           <StatBox label="Net income" value={`KES ${Number(net || 0).toFixed(2)}`} />
-          <StatBox label="Payouts pending" value={`KES ${Number(expenses?.byStatus?.pending || 0).toFixed(2)}`} />
+          <StatBox
+            label="Payouts pending"
+            value={`KES ${Number(expenses?.byStatus?.pending || 0).toFixed(2)}`}
+            sub={`${Number(expenses?.byStatus?.pendingCount || 0)} pending`}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatBox
+            label="Cashback payouts"
+            value={Number(expenses?.promoCashbackCount || 0)}
+            sub={`KES ${Number(expenses?.promoCashback || 0).toFixed(2)}`}
+          />
+          <StatBox
+            label="Prize payouts"
+            value={Number(expenses?.promoPrizesCount || 0)}
+            sub={`KES ${Number(expenses?.promoPrizes || 0).toFixed(2)}`}
+          />
+          <StatBox
+            label="Reward redemptions"
+            value={Number(expenses?.rewardsCount || 0)}
+            sub={`KES ${Number(expenses?.rewards || 0).toFixed(2)}`}
+          />
+          <StatBox
+            label="Payouts issued"
+            value={Number(expenses?.byStatus?.paidCount || 0)}
+            sub={`KES ${Number(expenses?.byStatus?.paid || 0).toFixed(2)}`}
+          />
         </div>
 
         <DataTable
@@ -727,11 +754,12 @@ export default function Reports() {
   );
 }
 
-function StatBox({ label, value }) {
+function StatBox({ label, value, sub }) {
   return (
     <div className="p-3 rounded-xl bg-surface2 border border-borderColor text-center">
       <p className="text-lg font-bold text-textPrimary truncate">{value}</p>
       <p className="text-textSecondary text-xs">{label}</p>
+      {sub && <p className="text-textMuted text-xs mt-0.5 truncate">{sub}</p>}
     </div>
   );
 }
