@@ -16,12 +16,17 @@ function getOrCreateLocalSale(staff) {
   return getById("sales", localStorage.getItem("tezipos-current-sale-id"));
 }
 
-export async function createLocalSale(staff) {
+// locationOverride lets an admin (or a supervisor granted can_switch_location)
+// ring up a sale for whichever shop they currently have active in the nav,
+// from their single login, instead of always their own home location. It's
+// only ever passed in by Till.jsx when that permission applies -- everyone
+// else keeps using their real staff.locationId.
+export async function createLocalSale(staff, locationOverride) {
   const localId = generateId();
   const sale = {
     local_id: localId,
     server_id: null,
-    location_id: staff?.locationId || 1,
+    location_id: locationOverride || staff?.locationId || 1,
     staff_id: staff?.id || 1,
     customer_id: null,
     subtotal: 0,
@@ -37,7 +42,7 @@ export async function createLocalSale(staff) {
   return sale;
 }
 
-export async function loadCurrentSale(staff) {
+export async function loadCurrentSale(staff, locationOverride) {
   const currentId = localStorage.getItem("tezipos-current-sale-id");
   if (currentId) {
     const sale = await getById("sales", currentId);
@@ -45,10 +50,10 @@ export async function loadCurrentSale(staff) {
       return sale;
     }
   }
-  return createLocalSale(staff);
+  return createLocalSale(staff, locationOverride);
 }
 
-export async function resetCurrentSale(staff) {
+export async function resetCurrentSale(staff, locationOverride) {
   const currentId = localStorage.getItem("tezipos-current-sale-id");
   if (currentId) {
     const sale = await getById("sales", currentId);
@@ -58,7 +63,7 @@ export async function resetCurrentSale(staff) {
       await putRecord("sales", sale);
     }
   }
-  return createLocalSale(staff);
+  return createLocalSale(staff, locationOverride);
 }
 
 export async function setCurrentSaleCustomer(localSaleId, customerId) {
@@ -244,17 +249,11 @@ export async function syncPendingSales() {
   }
 }
 
-async function doSyncPendingSales() {
-  const pending = await getAllPendingSnapshots();
-  if (pending.length === 0) {
-    return { syncComplete: true, synced: 0, errors: 0, conflicts: 0 };
-  }
-
-  const saleLocalIdToServerId = {};
-  const snapshot = {
-    locationId: pending[0]?.location_id || 1,
+function buildSnapshotForGroup(locationId, salesInGroup) {
+  return {
+    locationId,
     records: {
-      sales: pending.map((s) => ({
+      sales: salesInGroup.map((s) => ({
         local_id: s.local_id,
         staff_id: s.staff_id,
         customer_id: s.customer_id,
@@ -264,7 +263,7 @@ async function doSyncPendingSales() {
         payment_method: s.payment_method,
         status: s.status,
       })),
-      saleItems: pending.flatMap((s) =>
+      saleItems: salesInGroup.flatMap((s) =>
         s.items.map((i) => ({
           local_id: i.local_id,
           sale_local_id: s.local_id,
@@ -277,7 +276,7 @@ async function doSyncPendingSales() {
           line_total: i.line_total,
         })),
       ),
-      cylinderExchanges: pending.flatMap((s) =>
+      cylinderExchanges: salesInGroup.flatMap((s) =>
         s.exchanges.map((e) => ({
           local_id: e.local_id,
           sale_local_id: s.local_id,
@@ -287,7 +286,7 @@ async function doSyncPendingSales() {
           price_adjustment: e.price_adjustment,
         })),
       ),
-      payments: pending.flatMap((s) =>
+      payments: salesInGroup.flatMap((s) =>
         s.payments.map((p) => ({
           local_id: p.local_id,
           sale_local_id: s.local_id,
@@ -296,7 +295,7 @@ async function doSyncPendingSales() {
           status: p.status,
         })),
       ),
-      pointsLedger: pending.flatMap((s) =>
+      pointsLedger: salesInGroup.flatMap((s) =>
         (s.pointsLedger || []).map((pl) => ({
           local_id: pl.local_id,
           customer_id: pl.customer_id,
@@ -310,31 +309,79 @@ async function doSyncPendingSales() {
       promoWins: [],
     },
   };
+}
 
-  const result = await uploadSyncSnapshot(snapshot);
-
-  if (result && result.saleServerIds) {
-    Object.assign(saleLocalIdToServerId, result.saleServerIds);
+async function doSyncPendingSales() {
+  const pending = await getAllPendingSnapshots();
+  if (pending.length === 0) {
+    return { syncComplete: true, synced: 0, errors: 0, conflicts: 0 };
   }
 
+  // A single sync batch can span multiple shops -- e.g. an admin who
+  // switched shops between sales on the same login. The server attributes
+  // an entire upload to one location_id, so each shop's sales must go up
+  // in their own snapshot rather than being lumped under whichever sale
+  // happened to be pending[0] (that used to silently mis-attribute sales
+  // made at shop B to shop A).
+  const groups = new Map();
   for (const sale of pending) {
-    const serverId = saleLocalIdToServerId[sale.local_id];
-    if (serverId || (result && !result.errors)) {
-      sale.server_id = serverId || sale.server_id;
-      sale.sync_status = serverId ? "synced" : "pending";
-      await putRecord("sales", sale);
-      for (const item of sale.items) {
-        item.sync_status = serverId ? "synced" : "pending";
-        await putRecord("sale_items", item);
-      }
-      for (const pmt of sale.payments) {
-        pmt.sync_status = serverId ? "synced" : "pending";
-        await putRecord("payments", pmt);
+    const locationId = sale.location_id || 1;
+    if (!groups.has(locationId)) groups.set(locationId, []);
+    groups.get(locationId).push(sale);
+  }
+
+  const saleLocalIdToServerId = {};
+  const combined = {
+    synced: 0,
+    conflicts: 0,
+    errors: 0,
+    conflictRecords: [],
+    promoWins: [],
+  };
+
+  for (const [locationId, salesInGroup] of groups) {
+    const snapshot = buildSnapshotForGroup(locationId, salesInGroup);
+    let result;
+    try {
+      result = await uploadSyncSnapshot(snapshot);
+    } catch (err) {
+      combined.errors += salesInGroup.length;
+      console.error(`Sync failed for location ${locationId}:`, err.message);
+      continue;
+    }
+
+    combined.synced += result?.synced || 0;
+    combined.conflicts += result?.conflicts || 0;
+    combined.errors += result?.errors || 0;
+    if (result?.conflictRecords?.length) {
+      combined.conflictRecords.push(...result.conflictRecords);
+    }
+    if (result?.promoWins?.length) {
+      combined.promoWins.push(...result.promoWins);
+    }
+    if (result?.saleServerIds) {
+      Object.assign(saleLocalIdToServerId, result.saleServerIds);
+    }
+
+    for (const sale of salesInGroup) {
+      const serverId = result?.saleServerIds?.[sale.local_id];
+      if (serverId || (result && !result.errors)) {
+        sale.server_id = serverId || sale.server_id;
+        sale.sync_status = serverId ? "synced" : "pending";
+        await putRecord("sales", sale);
+        for (const item of sale.items) {
+          item.sync_status = serverId ? "synced" : "pending";
+          await putRecord("sale_items", item);
+        }
+        for (const pmt of sale.payments) {
+          pmt.sync_status = serverId ? "synced" : "pending";
+          await putRecord("payments", pmt);
+        }
       }
     }
   }
 
-  return result;
+  return { ...combined, saleServerIds: saleLocalIdToServerId };
 }
 
 export async function fetchReceiptForLocalSale(localSaleId) {

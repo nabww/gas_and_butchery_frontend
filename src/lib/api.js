@@ -394,44 +394,48 @@ export async function recordInvoicePayment(invoiceId, amount, method = "cash") {
 
 // ========== PRODUCTS API ==========
 
-export async function getProducts(businessType = null, includeInactive = false) {
+export async function getProducts(businessType = null, includeInactive = false, locationId) {
   const params = new URLSearchParams();
   if (businessType) params.set("business_type", businessType);
   if (includeInactive) params.set("include_inactive", "true");
+  if (locationId) params.set("location_id", locationId);
   const query = params.toString();
   return apiFetch(`/products${query ? `?${query}` : ""}`);
 }
 
-export async function createProduct(product) {
+export async function createProduct(product, locationId) {
   return apiFetch("/products", {
     method: "POST",
-    body: JSON.stringify(product),
+    body: JSON.stringify(locationId ? { ...product, location_id: locationId } : product),
   });
 }
 
-export async function updateProduct(productId, product) {
+export async function updateProduct(productId, product, locationId) {
   return apiFetch(`/products/${productId}`, {
     method: "PATCH",
-    body: JSON.stringify(product),
+    body: JSON.stringify(locationId ? { ...product, location_id: locationId } : product),
   });
 }
 
-export async function getCylinderBrands(includeInactive = false) {
-  const query = includeInactive ? "?include_inactive=true" : "";
-  return apiFetch(`/products/cylinder-brands${query}`);
+export async function getCylinderBrands(includeInactive = false, locationId) {
+  const params = new URLSearchParams();
+  if (includeInactive) params.set("include_inactive", "true");
+  if (locationId) params.set("location_id", locationId);
+  const query = params.toString();
+  return apiFetch(`/products/cylinder-brands${query ? `?${query}` : ""}`);
 }
 
-export async function createCylinderBrand(brandData) {
+export async function createCylinderBrand(brandData, locationId) {
   return apiFetch("/stock-admin/cylinders", {
     method: "POST",
-    body: JSON.stringify(brandData),
+    body: JSON.stringify(locationId ? { ...brandData, location_id: locationId } : brandData),
   });
 }
 
-export async function updateCylinderBrand(brandId, brandData) {
+export async function updateCylinderBrand(brandId, brandData, locationId) {
   return apiFetch(`/stock-admin/cylinders/${brandId}`, {
     method: "PUT",
-    body: JSON.stringify(brandData),
+    body: JSON.stringify(locationId ? { ...brandData, location_id: locationId } : brandData),
   });
 }
 
@@ -538,30 +542,36 @@ export async function approvePromoPayout(payoutId, pin) {
 
 // ========== STOCK ADMIN API ==========
 
-export async function getCylinderStockAdmin() {
-  return apiFetch("/stock-admin/cylinders");
+export async function getCylinderStockAdmin(locationId) {
+  const query = locationId ? `?location_id=${locationId}` : "";
+  return apiFetch(`/stock-admin/cylinders${query}`);
 }
 
-export async function getLowStockAlerts() {
-  return apiFetch("/stock-admin/cylinders/alerts");
+export async function getLowStockAlerts(locationId) {
+  const query = locationId ? `?location_id=${locationId}` : "";
+  return apiFetch(`/stock-admin/cylinders/alerts${query}`);
 }
 
-export async function adjustCylinderStock(brandId, data) {
+export async function adjustCylinderStock(brandId, data, locationId) {
   return apiFetch(`/stock-admin/cylinders/${brandId}`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: JSON.stringify(locationId ? { ...data, location_id: locationId } : data),
   });
 }
 
-export async function updateStockThreshold(brandId, threshold) {
+export async function updateStockThreshold(brandId, threshold, locationId) {
   return apiFetch(`/stock-admin/cylinders/${brandId}/threshold`, {
     method: "PUT",
-    body: JSON.stringify({ threshold }),
+    body: JSON.stringify(locationId ? { threshold, location_id: locationId } : { threshold }),
   });
 }
 
-export async function getOversellFlags(includeResolved = false) {
-  return apiFetch(`/stock-admin/oversells${includeResolved ? "?include_resolved=true" : ""}`);
+export async function getOversellFlags(includeResolved = false, locationId) {
+  const params = new URLSearchParams();
+  if (includeResolved) params.set("include_resolved", "true");
+  if (locationId) params.set("location_id", locationId);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/stock-admin/oversells${query}`);
 }
 
 export async function resolveOversellFlag(flagId) {
@@ -577,12 +587,17 @@ export async function redeemPoints(customerId, saleId, points) {
   });
 }
 
+export async function getOverridesReport() {
+  return apiFetch("/reports/overrides");
+}
+
 // ========== REPORTS API ==========
 
-export async function getSalesReport(startDate, endDate) {
+export async function getSalesReport(startDate, endDate, locationId) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
+  if (locationId) params.set("location_id", locationId);
   return apiFetch(`/reports/sales?${params.toString()}`);
 }
 
@@ -594,15 +609,29 @@ export async function getCustomersReport() {
   return apiFetch("/reports/customers");
 }
 
-export async function getSyncReport() {
-  return apiFetch("/reports/sync");
+export async function getSyncReport(locationId) {
+  const query = locationId ? `?location_id=${locationId}` : "";
+  return apiFetch(`/reports/sync${query}`);
 }
 
-export async function getLedgerReport(startDate, endDate) {
+export async function getLedgerReport(startDate, endDate, locationId) {
   const params = new URLSearchParams();
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
+  if (locationId) params.set("location_id", locationId);
   return apiFetch(`/reports/ledger?${params.toString()}`);
+}
+
+export async function getTopCustomersReport(startDate, endDate, locationId) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  if (locationId) params.set("location_id", locationId);
+  return apiFetch(`/reports/top-customers?${params.toString()}`);
+}
+
+export async function getArAgingReport() {
+  return apiFetch("/reports/ar-aging");
 }
 
 // ========== SYNC API ==========

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../lib/useTheme';
 import { login } from '../lib/api';
 
@@ -39,6 +39,28 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
       setSubmitting(false);
     }
   };
+
+  // Kiosk touch keypad is the primary input, but anyone on a laptop/desktop
+  // should be able to type their PIN on a physical keyboard too -- number
+  // row, numpad, Backspace, and Enter to submit early once 6 digits are in.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (submitting) return;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleKey(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleKey('del');
+      } else if (e.key === 'Enter' && pin.length === PIN_LENGTH) {
+        e.preventDefault();
+        submit(pin);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pin, submitting]);
+
   return (
     <div
       style={{

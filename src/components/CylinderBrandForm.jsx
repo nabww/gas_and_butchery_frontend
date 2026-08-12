@@ -4,12 +4,14 @@ import {
   createCylinderBrand,
   updateCylinderBrand,
 } from "../lib/api";
+import { useActiveLocation } from "../contexts/LocationContext";
 
 const NEW_BRAND_VALUE = "new";
 const inputClass =
   'w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm';
 
 export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
+  const { activeLocationId } = useActiveLocation();
   const defaults = editing || {
     brand: '',
     weight_kg: '',
@@ -47,7 +49,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       setLoadingBrands(true);
       setError('');
       try {
-        const brands = await getCylinderBrands(true);
+        const brands = await getCylinderBrands(true, activeLocationId);
         if (isMounted) setExistingBrands(brands);
       } catch (err) {
         if (isMounted) setError(err.message || 'Failed to load brands');
@@ -59,7 +61,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
     return () => {
       isMounted = false;
     };
-  }, [editing]);
+  }, [editing, activeLocationId]);
 
   useEffect(() => {
     if (editing) {
@@ -155,7 +157,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           empty_qty: Number(emptyQty || 0),
           is_active: isActive,
         };
-        await updateCylinderBrand(editing.cylinder_brand_id, payload);
+        await updateCylinderBrand(editing.cylinder_brand_id, payload, activeLocationId);
       } else if (isNewBrand) {
         const payload = {
           brand: brand.trim(),
@@ -167,7 +169,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           empty_qty: Number(emptyQty || 0),
           is_active: isActive,
         };
-        await createCylinderBrand(payload);
+        await createCylinderBrand(payload, activeLocationId);
       } else {
         const selected = existingBrands.find(
           (b) => String(b.id) === selectedBrandId,
@@ -183,7 +185,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           low_stock_threshold: Number(lowStockThreshold || 0),
           is_active: isActive,
         };
-        await updateCylinderBrand(selected.id, payload);
+        await updateCylinderBrand(selected.id, payload, activeLocationId);
       }
 
       onSaved();
@@ -219,7 +221,12 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
   const hasSelection = editing || isNewBrand || selectedBrandId;
 
   return (
-    <div className='rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4'>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!saving && hasSelection) submit();
+      }}
+      className='rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4'>
       <div className='flex items-center justify-between gap-3'>
         <p className='text-textPrimary text-sm font-semibold'>{title}</p>
         {editing && (
@@ -371,13 +378,12 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
 
       <div className='flex gap-2'>
         <button
-          type='button'
-          onClick={submit}
+          type='submit'
           disabled={saving || !hasSelection}
           className='px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50'>
           {buttonLabel}
         </button>
       </div>
-    </div>
+    </form>
   );
 }

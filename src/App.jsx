@@ -10,11 +10,13 @@ import CorporateAccountsAdmin from "./pages/CorporateAccountsAdmin";
 import CustomersAdmin from "./pages/CustomersAdmin";
 import StaffAdmin from "./pages/StaffAdmin";
 import Reports from "./pages/Reports";
+import Overrides from "./pages/Overrides";
 
 import { getStoredStaff, logout } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
 import { CartProvider } from "./contexts/CartContext";
+import { LocationProvider } from "./contexts/LocationContext";
 
 // Landing path per role, per build plan Section 5b.
 const LANDING_BY_ROLE = {
@@ -45,9 +47,20 @@ export default function App() {
 
     const syncIfOnline = () => {
       if (navigator.onLine) {
-        syncPendingSales().catch((err) => {
-          console.warn("Background sync failed:", err.message);
-        });
+        syncPendingSales()
+          .then((result) => {
+            // Synced offline sales only deduct stock on the server once sync
+            // runs (see sync.service.js) — tell any open catalog to refetch
+            // so filled/empty/qty_on_hand reflect the just-synced sales.
+            if (result?.synced > 0) {
+              window.dispatchEvent(
+                new CustomEvent("tezipos:sales-synced", { detail: result }),
+              );
+            }
+          })
+          .catch((err) => {
+            console.warn("Background sync failed:", err.message);
+          });
       }
     };
 
@@ -84,7 +97,8 @@ export default function App() {
 
   return (
     <CartProvider>
-      <div style={{ minHeight: "100vh", background: "var(--surface-1)" }}>
+      <LocationProvider staff={staff}>
+        <div style={{ minHeight: "100vh", background: "var(--surface-1)" }}>
         <RoleNav
           staff={staff}
           currentPath={currentPath}
@@ -109,10 +123,13 @@ export default function App() {
           <StaffAdmin staffRole={staff.role} />
         ) : currentPath === "/reports" ? (
           <Reports />
+        ) : currentPath === "/overrides" ? (
+          <Overrides />
         ) : (
           <Placeholder name={currentPath.replace("/", "") || "till"} />
         )}
       </div>
+      </LocationProvider>
     </CartProvider>
   );
 }

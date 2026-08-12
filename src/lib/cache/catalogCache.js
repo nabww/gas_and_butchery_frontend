@@ -8,9 +8,9 @@ function normalizeList(response) {
   return [];
 }
 
-export async function refreshProductCache(businessType = null) {
+export async function refreshProductCache(businessType = null, locationId) {
   try {
-    const response = await getProducts(businessType);
+    const response = await getProducts(businessType, false, locationId);
     const products = normalizeList(response);
     for (const product of products) {
       await putRecord("products", {
@@ -33,11 +33,11 @@ export async function getCachedProducts(businessType = null) {
   return all;
 }
 
-export async function loadProducts(businessType = null) {
-  console.log("loadProducts:", { businessType, online: navigator.onLine });
+export async function loadProducts(businessType = null, locationId) {
+  console.log("loadProducts:", { businessType, locationId, online: navigator.onLine });
   if (navigator.onLine) {
     try {
-      return await refreshProductCache(businessType);
+      return await refreshProductCache(businessType, locationId);
     } catch (err) {
       console.warn("Falling back to cached products", err.message);
       return getCachedProducts(businessType);
@@ -47,9 +47,9 @@ export async function loadProducts(businessType = null) {
   return getCachedProducts(businessType);
 }
 
-export async function refreshCylinderBrandCache() {
+export async function refreshCylinderBrandCache(locationId) {
   try {
-    const response = await getCylinderBrands();
+    const response = await getCylinderBrands(false, locationId);
     const brands = normalizeList(response);
     for (const brand of brands) {
       await putRecord("cylinder_brands", {
@@ -68,10 +68,10 @@ export async function getCachedCylinderBrands() {
   return (await getAll("cylinder_brands")) || [];
 }
 
-export async function loadCylinderBrands() {
+export async function loadCylinderBrands(locationId) {
   if (navigator.onLine) {
     try {
-      return await refreshCylinderBrandCache();
+      return await refreshCylinderBrandCache(locationId);
     } catch (err) {
       return getCachedCylinderBrands();
     }

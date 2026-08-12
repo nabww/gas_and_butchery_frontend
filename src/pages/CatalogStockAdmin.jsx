@@ -18,12 +18,14 @@ import {
   resolveOversellFlag,
 } from "../lib/api";
 import CylinderBrandForm from "../components/CylinderBrandForm";
+import { useActiveLocation } from "../contexts/LocationContext";
 
 const businessOptions = ["butchery", "accessory"];
 const inputClass =
   "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
 
 function ProductForm({ editing, onSaved, onCancel }) {
+  const { activeLocationId } = useActiveLocation();
   const defaults = editing || {
     name: "",
     business_type: "butchery",
@@ -95,9 +97,9 @@ function ProductForm({ editing, onSaved, onCancel }) {
       };
 
       if (editing) {
-        await updateProduct(editing.id, payload);
+        await updateProduct(editing.id, payload, activeLocationId);
       } else {
-        await createProduct(payload);
+        await createProduct(payload, activeLocationId);
       }
 
       onSaved();
@@ -109,7 +111,12 @@ function ProductForm({ editing, onSaved, onCancel }) {
   };
 
   return (
-    <div className="rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-textPrimary text-sm font-semibold">
           {editing ? "Edit product" : "Add product"}
@@ -233,8 +240,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
 
       <div className="flex gap-2">
         <button
-          type="button"
-          onClick={submit}
+          type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
           {saving
@@ -246,7 +252,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
               : "Create product"}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -338,6 +344,7 @@ function GasStockRow({
   onEdit,
   isExpanded,
   onCancelEdit,
+  activeLocationId,
 }) {
   const [editing, setEditing] = useState(false);
   const [filledQty, setFilledQty] = useState(item.filled_qty);
@@ -357,10 +364,10 @@ function GasStockRow({
         await adjustCylinderStock(item.cylinder_brand_id, {
           filled_qty: parseInt(filledQty),
           empty_qty: parseInt(emptyQty),
-        });
+        }, activeLocationId);
       }
       if (thresholdChanged) {
-        await updateStockThreshold(item.cylinder_brand_id, parseInt(threshold));
+        await updateStockThreshold(item.cylinder_brand_id, parseInt(threshold), activeLocationId);
       }
 
       onUpdated();
@@ -378,6 +385,15 @@ function GasStockRow({
     setEmptyQty(item.empty_qty);
     setThreshold(item.low_stock_threshold);
     setEditing(false);
+  };
+
+  const handleFieldKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!saving) handleSave();
+    } else if (e.key === "Escape") {
+      handleCancel();
+    }
   };
 
   const stockVariant =
@@ -401,6 +417,7 @@ function GasStockRow({
               min="0"
               value={filledQty}
               onChange={(e) => setFilledQty(e.target.value)}
+              onKeyDown={handleFieldKeyDown}
               className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
             />
           ) : (
@@ -423,6 +440,7 @@ function GasStockRow({
               min="0"
               value={emptyQty}
               onChange={(e) => setEmptyQty(e.target.value)}
+              onKeyDown={handleFieldKeyDown}
               className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
             />
           ) : (
@@ -436,6 +454,7 @@ function GasStockRow({
               min="0"
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
+              onKeyDown={handleFieldKeyDown}
               className="w-20 px-2 py-1 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm text-center focus:outline-none focus:border-primary"
             />
           ) : (
@@ -505,6 +524,7 @@ function GasStockRow({
 }
 
 function CatalogTab() {
+  const { activeLocationId } = useActiveLocation();
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -518,7 +538,7 @@ function CatalogTab() {
     setLoading(true);
     setError("");
     try {
-      const rows = await getProducts(null, true);
+      const rows = await getProducts(null, true, activeLocationId);
       setProducts(rows);
     } catch (err) {
       setError(err.message || "Failed to load catalog");
@@ -529,7 +549,7 @@ function CatalogTab() {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [activeLocationId]);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -688,6 +708,7 @@ function CatalogTab() {
 }
 
 function GasStockTab({ staffRole }) {
+  const { activeLocationId } = useActiveLocation();
   const [stock, setStock] = useState([]);
   const [oversells, setOversells] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -703,8 +724,8 @@ function GasStockTab({ staffRole }) {
     setError("");
     try {
       const [stockData, oversellData] = await Promise.all([
-        getCylinderStockAdmin(),
-        getOversellFlags(),
+        getCylinderStockAdmin(activeLocationId),
+        getOversellFlags(false, activeLocationId),
       ]);
       setStock(stockData);
       setOversells(oversellData);
@@ -713,7 +734,7 @@ function GasStockTab({ staffRole }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeLocationId]);
 
   useEffect(() => {
     loadStock();
@@ -856,6 +877,7 @@ function GasStockTab({ staffRole }) {
                   onToast={showToast}
                   onUpdated={loadStock}
                   onEdit={openEdit}
+                  activeLocationId={activeLocationId}
                   isExpanded={expandedId === item.cylinder_brand_id}
                   onCancelEdit={() => {
                     setExpandedId(null);

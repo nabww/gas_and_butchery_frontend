@@ -221,36 +221,51 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
       }
 
       if (navigator.onLine) {
+        // Only a failure to sync the sale itself means it's still pending
+        // locally. Fetching the receipt afterwards is just for display --
+        // if that hiccups (slow response, brief network blip) the sale has
+        // already completed and synced, so it must not be treated the same
+        // as a real sync failure (that used to skip resetCart() entirely
+        // and leave the till stuck showing a completed sale/cart).
+        let syncResult;
         try {
-          const syncResult = await syncPendingSales();
-          const serverSaleId =
-            syncResult?.saleServerIds?.[saleLocalId] || saleId;
-          const promo = syncResult?.promoWins?.find(
-            (entry) => entry.saleId === serverSaleId,
-          );
-          if (promo?.wins?.length && serverSaleId && serverSaleId !== saleLocalId) {
-            setReceiptSaleId(serverSaleId);
-            setPendingPromoWins(promo.wins);
-            setShowPromoModal(true);
-          } else {
-            const receiptText =
-              serverSaleId && serverSaleId !== saleLocalId
-                ? await getSaleReceipt(serverSaleId)
-                : "Receipt will print after sync.";
-            setReceipt(receiptText);
-            setShowReceipt(true);
-            setTimeout(() => {
-              resetCart();
-              setShowReceipt(false);
-              setReceipt("");
-              setPromoMessage("");
-              onSaleCompleted?.();
-            }, 3000);
-          }
+          syncResult = await syncPendingSales();
         } catch (syncErr) {
           setError(
             "Sale saved locally. It will sync when the connection is stable.",
           );
+          setLoading(false);
+          return;
+        }
+
+        const serverSaleId =
+          syncResult?.saleServerIds?.[saleLocalId] || saleId;
+        const promo = syncResult?.promoWins?.find(
+          (entry) => entry.saleId === serverSaleId,
+        );
+        if (promo?.wins?.length && serverSaleId && serverSaleId !== saleLocalId) {
+          setReceiptSaleId(serverSaleId);
+          setPendingPromoWins(promo.wins);
+          setShowPromoModal(true);
+        } else {
+          let receiptText = "Receipt will print after sync.";
+          if (serverSaleId && serverSaleId !== saleLocalId) {
+            try {
+              receiptText = await getSaleReceipt(serverSaleId);
+            } catch (receiptErr) {
+              receiptText =
+                "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.";
+            }
+          }
+          setReceipt(receiptText);
+          setShowReceipt(true);
+          setTimeout(() => {
+            resetCart();
+            setShowReceipt(false);
+            setReceipt("");
+            setPromoMessage("");
+            onSaleCompleted?.();
+          }, 3000);
         }
       } else {
         setError(
@@ -401,23 +416,34 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         pendingAccountCharge.corporateAccountId,
         staff.id,
       );
-      const receiptText = await getSaleReceipt(pendingAccountCharge.saleId);
-      setReceipt(receiptText);
-      setShowReceipt(true);
-      setPendingAccountCharge(null);
-      setApprovalPin("");
-      setTimeout(() => {
-        resetCart();
-        setShowReceipt(false);
-        setReceipt("");
-        setPromoMessage("");
-        onSaleCompleted?.();
-      }, 3000);
     } catch (err) {
       setApprovalError(err.message || "Approval failed");
-    } finally {
       setApprovalLoading(false);
+      return;
     }
+
+    // The account has already been charged at this point -- a receipt-fetch
+    // hiccup below must not be reported as an approval failure, nor should
+    // it stop the cart from resetting for a sale that already went through.
+    let receiptText;
+    try {
+      receiptText = await getSaleReceipt(pendingAccountCharge.saleId);
+    } catch (err) {
+      receiptText =
+        "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.";
+    }
+    setReceipt(receiptText);
+    setShowReceipt(true);
+    setPendingAccountCharge(null);
+    setApprovalPin("");
+    setTimeout(() => {
+      resetCart();
+      setShowReceipt(false);
+      setReceipt("");
+      setPromoMessage("");
+      onSaleCompleted?.();
+    }, 3000);
+    setApprovalLoading(false);
   };
 
   const handlePromoClose = () => {
@@ -425,7 +451,11 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
     setPendingPromoWins([]);
     setReceiptSaleId(null);
     if (!receiptSaleId) return;
+    // The sale is already synced by the time the promo modal can appear --
+    // a receipt-fetch failure here is just a display hiccup, not a reason
+    // to leave the till stuck on a completed sale/cart.
     getSaleReceipt(receiptSaleId)
+      .catch(() => "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.")
       .then((receiptText) => {
         setReceipt(receiptText);
         setMpesaSuccess(paymentMethod === "mpesa");
@@ -438,8 +468,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           setMpesaSuccess(false);
           onSaleCompleted?.();
         }, 3000);
-      })
-      .catch((err) => setError(err.message || "Failed to load receipt"));
+      });
   };
 
   const handlePromoConfirm = async (decisions, pin) => {
@@ -463,7 +492,16 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
       setReceiptSaleId(null);
       return;
     }
-    const receiptText = await getSaleReceipt(receiptSaleId);
+    // Same reasoning as handlePromoClose: the sale (and the promo payout
+    // decision above) already succeeded -- don't let a receipt-fetch
+    // hiccup stop the cart from resetting.
+    let receiptText;
+    try {
+      receiptText = await getSaleReceipt(receiptSaleId);
+    } catch (err) {
+      receiptText =
+        "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.";
+    }
     setReceipt(receiptText);
     setMpesaSuccess(paymentMethod === "mpesa");
     setShowReceipt(true);
@@ -562,7 +600,12 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           </div>
         </div>
       ) : pendingAccountCharge ? (
-        <div className="p-4 rounded-2xl bg-warning/10 border border-warning/30 space-y-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!approvalLoading && approvalPin.length === 6) handleApproveCreditOverride();
+          }}
+          className="p-4 rounded-2xl bg-warning/10 border border-warning/30 space-y-3">
           <p className="text-warning font-semibold text-sm">
             This sale (KES {total.toFixed(2)}) would exceed the account's available credit
             (KES {pendingAccountCharge.creditCheck.availableCredit.toFixed(2)} left). A
@@ -572,6 +615,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
             type="password"
             inputMode="numeric"
             maxLength={6}
+            autoFocus
             value={approvalPin}
             onChange={(e) => setApprovalPin(e.target.value)}
             placeholder="Supervisor/admin PIN"
@@ -582,12 +626,13 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           )}
           <div className="flex gap-2">
             <button
-              onClick={handleApproveCreditOverride}
+              type="submit"
               disabled={approvalLoading || approvalPin.length !== 6}
               className="flex-1 py-2.5 rounded-xl bg-primary text-onPrimary text-sm font-semibold hover:bg-primaryDark transition-colors disabled:opacity-50">
               {approvalLoading ? "Verifying..." : "Approve & Charge"}
             </button>
             <button
+              type="button"
               onClick={() => {
                 setPendingAccountCharge(null);
                 setApprovalPin("");
@@ -597,7 +642,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
               Cancel
             </button>
           </div>
-        </div>
+        </form>
       ) : showReceipt ? (
         <div className="p-4 rounded-2xl bg-surface1 border border-borderColor space-y-3">
           {mpesaSuccess && (
@@ -622,7 +667,12 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canCheckout) handleProcessPayment();
+          }}
+          className="space-y-4">
           <div className="flex justify-between items-center p-4 rounded-2xl bg-surface1 border border-borderColor">
             <span className="text-textSecondary font-medium">Total due</span>
             <span className="text-textPrimary text-xl font-bold">{formatKes(total)}</span>
@@ -762,12 +812,12 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
           )}
 
           <button
-            onClick={handleProcessPayment}
+            type="submit"
             disabled={!canCheckout}
             className="w-full rounded-xl bg-primary text-onPrimary font-bold py-4 px-4 text-base shadow-card transition-all duration-150 hover:bg-primaryDark hover:shadow-card-hover active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
             {loading ? "Processing..." : "Checkout"}
           </button>
-        </div>
+        </form>
       )}
     </div>
   );

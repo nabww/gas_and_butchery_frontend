@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useActiveLocation } from "../contexts/LocationContext";
 import {
   getPromoPayouts,
   listCorporateAccounts,
@@ -9,13 +10,17 @@ import {
   getCustomersReport,
   getSyncReport,
   getLedgerReport,
+  getTopCustomersReport,
+  getArAgingReport,
 } from "../lib/api";
 
 const TABS = [
   { id: "promotions", label: "Promotions" },
   { id: "corporate", label: "Corporate" },
+  { id: "ar-aging", label: "AR aging" },
   { id: "inventory", label: "Inventory" },
   { id: "sales", label: "Sales" },
+  { id: "top-customers", label: "Top customers" },
   { id: "ledger", label: "Ledger" },
   { id: "loyalty", label: "Loyalty" },
   { id: "customers", label: "Customers" },
@@ -23,6 +28,7 @@ const TABS = [
 ];
 
 export default function Reports() {
+  const { activeLocationId } = useActiveLocation();
   const [activeTab, setActiveTab] = useState("promotions");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -58,6 +64,14 @@ export default function Reports() {
   const [ledgerEnd, setLedgerEnd] = useState(today);
   const [ledgerReport, setLedgerReport] = useState(null);
 
+  // Top customers
+  const [topCustomersStart, setTopCustomersStart] = useState(today);
+  const [topCustomersEnd, setTopCustomersEnd] = useState(today);
+  const [topCustomers, setTopCustomers] = useState([]);
+
+  // AR aging
+  const [arAging, setArAging] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -73,15 +87,15 @@ export default function Reports() {
           if (!cancelled) setAccounts(data);
         } else if (activeTab === "inventory") {
           const [alertsData, oversellsData] = await Promise.all([
-            getLowStockAlerts(),
-            getOversellFlags(),
+            getLowStockAlerts(activeLocationId),
+            getOversellFlags(false, activeLocationId),
           ]);
           if (!cancelled) {
             setAlerts(alertsData);
             setOversells(oversellsData);
           }
         } else if (activeTab === "sales") {
-          const data = await getSalesReport(salesStart, salesEnd);
+          const data = await getSalesReport(salesStart, salesEnd, activeLocationId);
           if (!cancelled) setSalesReport(data);
         } else if (activeTab === "loyalty") {
           const data = await getLoyaltyReport();
@@ -90,11 +104,17 @@ export default function Reports() {
           const data = await getCustomersReport();
           if (!cancelled) setCustomersReport(data);
         } else if (activeTab === "sync") {
-          const data = await getSyncReport();
+          const data = await getSyncReport(activeLocationId);
           if (!cancelled) setSyncReport(data);
         } else if (activeTab === "ledger") {
-          const data = await getLedgerReport(ledgerStart, ledgerEnd);
+          const data = await getLedgerReport(ledgerStart, ledgerEnd, activeLocationId);
           if (!cancelled) setLedgerReport(data);
+        } else if (activeTab === "top-customers") {
+          const data = await getTopCustomersReport(topCustomersStart, topCustomersEnd, activeLocationId);
+          if (!cancelled) setTopCustomers(data.customers || []);
+        } else if (activeTab === "ar-aging") {
+          const data = await getArAgingReport();
+          if (!cancelled) setArAging(data);
         }
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load report data.");
@@ -107,7 +127,7 @@ export default function Reports() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, salesStart, salesEnd, ledgerStart, ledgerEnd]);
+  }, [activeTab, salesStart, salesEnd, ledgerStart, ledgerEnd, topCustomersStart, topCustomersEnd, activeLocationId]);
 
   const filteredPayouts = useMemo(() => {
     if (payoutFilter === "all") return payouts;
@@ -225,6 +245,83 @@ export default function Reports() {
     );
   };
 
+  const renderArAging = () => {
+    const data = arAging || {};
+    const invoices = data.invoices || [];
+    const customers = data.customers || [];
+    const invoiceRows = invoices.map((i) => ({
+      id: i.id,
+      customer: i.customer_name || i.customer_phone || `Account ${i.corporate_account_id}`,
+      status: i.status,
+      days: i.days,
+      bucket: i.bucket,
+      total: Number(i.total || 0).toFixed(2),
+      paid: Number(i.paid || 0).toFixed(2),
+      outstanding: Number(i.outstanding || 0).toFixed(2),
+      due: i.due_date ? new Date(i.due_date).toLocaleDateString("en-KE") : new Date(i.created_at).toLocaleDateString("en-KE"),
+    }));
+    const customerRows = customers.map((c) => ({
+      customer: c.customer_name || c.customer_phone || `Account ${c.corporate_account_id}`,
+      invoices: c.invoices,
+      outstanding: Number(c.outstanding || 0).toFixed(2),
+    }));
+
+    const bucketLabels = {
+      current: "Current",
+      "1to30": "1–30 days",
+      "31to60": "31–60 days",
+      over60: "Over 60 days",
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-textPrimary">Accounts receivable aging</h2>
+          {renderExportButtons(invoiceRows, "ar-aging")}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatBox label="Outstanding" value={`KES ${Number(data.totalOutstanding || 0).toFixed(2)}`} />
+          <StatBox label="Invoices" value={data.invoiceCount || 0} />
+          <StatBox label="Customers" value={customers.length} />
+          <StatBox label="Over 60" value={`KES ${Number(data.buckets?.over60 || 0).toFixed(2)}`} />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Object.entries(bucketLabels).map(([key, label]) => (
+            <StatBox key={key} label={label} value={`KES ${Number(data.buckets?.[key] || 0).toFixed(2)}`} />
+          ))}
+        </div>
+
+        <h3 className="text-md font-bold text-textPrimary">Outstanding by customer</h3>
+        <DataTable
+          columns={[
+            { key: "customer", label: "Customer" },
+            { key: "invoices", label: "Invoices", right: true },
+            { key: "outstanding", label: "Outstanding", right: true },
+          ]}
+          rows={customerRows}
+        />
+
+        <h3 className="text-md font-bold text-textPrimary">Invoice detail</h3>
+        <DataTable
+          columns={[
+            { key: "id", label: "Invoice" },
+            { key: "customer", label: "Customer" },
+            { key: "status", label: "Status" },
+            { key: "days", label: "Days", right: true },
+            { key: "bucket", label: "Bucket" },
+            { key: "total", label: "Total", right: true },
+            { key: "paid", label: "Paid", right: true },
+            { key: "outstanding", label: "Outstanding", right: true },
+            { key: "due", label: "Due / created" },
+          ]}
+          rows={invoiceRows}
+        />
+      </div>
+    );
+  };
+
   const renderInventory = () => {
     const alertRows = alerts.map((a) => ({
       item: `${a.brand || ""} ${a.weight_kg ? `${a.weight_kg}kg` : ""}`.trim() || "—",
@@ -337,6 +434,57 @@ export default function Reports() {
             { key: "discount", label: "Discount", right: true },
             { key: "total", label: "Total", right: true },
             { key: "items", label: "Items" },
+          ]}
+          rows={rows}
+        />
+      </div>
+    );
+  };
+
+  const renderTopCustomers = () => {
+    const rows = topCustomers.map((c, i) => ({
+      rank: i + 1,
+      name: c.name || "—",
+      phone: c.phone,
+      type: c.customer_type,
+      sales: c.sale_count,
+      spend: Number(c.total_spend || 0).toFixed(2),
+      points: c.points_balance,
+      last_purchase: c.last_purchase_at ? new Date(c.last_purchase_at).toLocaleDateString("en-KE") : "—",
+    }));
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-textPrimary">Top customers</h2>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={topCustomersStart}
+              onChange={(e) => setTopCustomersStart(e.target.value)}
+              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+            <span className="text-textSecondary text-sm">to</span>
+            <input
+              type="date"
+              value={topCustomersEnd}
+              onChange={(e) => setTopCustomersEnd(e.target.value)}
+              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+            {renderExportButtons(rows, "top-customers")}
+          </div>
+        </div>
+
+        <DataTable
+          columns={[
+            { key: "rank", label: "#" },
+            { key: "name", label: "Customer" },
+            { key: "phone", label: "Phone" },
+            { key: "type", label: "Type" },
+            { key: "sales", label: "Sales", right: true },
+            { key: "spend", label: "Total spend", right: true },
+            { key: "points", label: "Points", right: true },
+            { key: "last_purchase", label: "Last purchase" },
           ]}
           rows={rows}
         />
@@ -521,10 +669,14 @@ export default function Reports() {
         return renderPromotions();
       case "corporate":
         return renderCorporate();
+      case "ar-aging":
+        return renderArAging();
       case "inventory":
         return renderInventory();
       case "sales":
         return renderSales();
+      case "top-customers":
+        return renderTopCustomers();
       case "ledger":
         return renderLedger();
       case "loyalty":
@@ -545,7 +697,7 @@ export default function Reports() {
         Overview of sales, promotions, inventory, loyalty, and accounts.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {TABS.map((tab) => (
           <button
             key={tab.id}

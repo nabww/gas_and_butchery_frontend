@@ -82,7 +82,12 @@ function RegisterForm({ prefillPhone, onRegistered, onCancel }) {
     "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
 
   return (
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl bg-surface2 border border-borderColor p-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!saving && consentGiven) submit();
+      }}
+      className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl bg-surface2 border border-borderColor p-4">
       <input
         className={input}
         placeholder="Phone (e.g. +254712345678)"
@@ -119,18 +124,19 @@ function RegisterForm({ prefillPhone, onRegistered, onCancel }) {
       {error && <p className="md:col-span-2 text-danger text-xs font-semibold">{error}</p>}
       <div className="md:col-span-2 flex gap-2">
         <button
-          onClick={submit}
+          type="submit"
           disabled={saving || !consentGiven}
           className="px-4 py-2 rounded-lg bg-primary text-onPrimary font-semibold text-sm disabled:opacity-50">
           {saving ? "Registering..." : "Register customer"}
         </button>
         <button
+          type="button"
           onClick={onCancel}
           className="px-4 py-2 rounded-lg border border-borderColor bg-surface1 text-textSecondary font-semibold text-sm hover:bg-surface3 hover:text-textPrimary">
           Cancel
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 

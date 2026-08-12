@@ -71,7 +71,12 @@ function BusinessConfigSection({ message, setMessage }) {
   }
 
   return (
-    <section className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!saving) save();
+      }}
+      className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
       <div>
         <label htmlFor="business-name" className="text-textPrimary font-semibold text-sm">
           Business name
@@ -144,13 +149,13 @@ function BusinessConfigSection({ message, setMessage }) {
 
       <div className="border-t border-borderColor pt-5 flex justify-end">
         <button
-          onClick={save}
+          type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
           {saving ? "Saving..." : "Save business settings"}
         </button>
       </div>
-    </section>
+    </form>
   );
 }
 
@@ -232,6 +237,16 @@ function LoyaltySettingsSection({ message, setMessage }) {
   const input =
     "w-full mt-2 px-3 py-2 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm focus:outline-none focus:border-primary";
 
+  // This section autosaves on blur rather than a Save button; Enter should
+  // save immediately too instead of making someone click elsewhere first.
+  const handleFieldKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.target.blur();
+      saveIfChanged();
+    }
+  };
+
   if (loading) {
     return <div className="text-textSecondary">Loading loyalty settings…</div>;
   }
@@ -252,6 +267,7 @@ function LoyaltySettingsSection({ message, setMessage }) {
           value={earnRate}
           onChange={(e) => setEarnRate(e.target.value)}
           onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
           disabled={saving}
         />
         <p className="text-textMuted text-sm mt-2">
@@ -277,6 +293,7 @@ function LoyaltySettingsSection({ message, setMessage }) {
           value={redemptionRate}
           onChange={(e) => setRedemptionRate(e.target.value)}
           onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
           disabled={saving}
         />
         <p className="text-textMuted text-sm mt-2">
@@ -301,6 +318,7 @@ function LoyaltySettingsSection({ message, setMessage }) {
           value={cashbackMax}
           onChange={(e) => setCashbackMax(e.target.value)}
           onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
           disabled={saving}
         />
         <p className="text-textMuted text-sm mt-2">
@@ -322,6 +340,7 @@ function LoyaltySettingsSection({ message, setMessage }) {
           value={maxRedemptionPercent}
           onChange={(e) => setMaxRedemptionPercent(e.target.value)}
           onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
           disabled={saving}
         />
         <p className="text-textMuted text-sm mt-2">

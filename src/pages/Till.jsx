@@ -6,6 +6,7 @@ import {
 } from "../lib/db/syncQueue";
 import { getStoredStaff } from "../lib/api";
 import { useCart } from "../contexts/CartContext";
+import { useActiveLocation } from "../contexts/LocationContext";
 import {
   isOfflineSalesEnabled,
   setOfflineSalesEnabled,
@@ -34,6 +35,22 @@ const DEFAULT_BUSINESSES = ["butchery", "gas"];
 
 export default function Till({ staff, onNavigate }) {
   const isOnline = useOnlineStatus();
+  const { activeLocationId } = useActiveLocation();
+  // A supervisor/admin who has switched shops via the nav sees that shop's
+  // catalog and stock here too — useful for admins checking stock or
+  // covering a rush at another branch. Cashiers (and anyone without switch
+  // rights) always see their own login location; undefined here means
+  // "use my own location" server-side.
+  const canSwitchLocation =
+    staff?.role === "admin" || (staff?.role === "supervisor" && staff?.canSwitchLocation);
+  const catalogLocationId = canSwitchLocation ? activeLocationId : undefined;
+  // Selling *as* another shop (the sale itself gets that shop's location_id)
+  // is admin-only -- the sync endpoint only lets an admin token upload a
+  // snapshot for a location other than their own (see sync.routes.js). A
+  // supervisor with can_switch_location can browse another shop's stock
+  // here but still rings up sales under their own home location.
+  const saleLocationOverride =
+    staff?.role === "admin" ? activeLocationId : undefined;
   const allowedBusinesses = useMemo(() => {
     const access = staff?.businessAccess || [];
     const ordered = DEFAULT_BUSINESSES.filter((b) => access.includes(b));
@@ -80,7 +97,7 @@ export default function Till({ staff, onNavigate }) {
     setError("");
     try {
       const currentStaff = staff || getStoredStaff();
-      const sale = await loadCurrentSale(currentStaff);
+      const sale = await loadCurrentSale(currentStaff, saleLocationOverride);
       setSaleId(sale.server_id || sale.local_id);
       setSaleLocalId(sale.local_id);
       setDiscountAmount(sale.discount_amount || 0);
@@ -112,7 +129,7 @@ export default function Till({ staff, onNavigate }) {
   const handleStartNewSale = async () => {
     const currentStaff = staff || getStoredStaff();
     try {
-      await resetCurrentSale(currentStaff);
+      await resetCurrentSale(currentStaff, saleLocationOverride);
     } catch (err) {
       setError(err.message);
     }
@@ -169,6 +186,7 @@ export default function Till({ staff, onNavigate }) {
               onSelectBusiness={setBusinessType}
               staffRole={staff?.role}
               refreshSignal={catalogRefreshKey}
+              locationId={catalogLocationId}
             />
           </div>
 

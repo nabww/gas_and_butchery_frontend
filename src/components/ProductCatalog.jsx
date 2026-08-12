@@ -17,6 +17,7 @@ export default function ProductCatalog({
   onSelectBusiness,
   staffRole,
   refreshSignal = 0,
+  locationId,
 }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ export default function ProductCatalog({
 
   useEffect(() => {
     loadProducts();
-  }, [businessType]);
+  }, [businessType, locationId]);
 
   // Reload stock quantities after a sale completes. Skip the first
   // render — the businessType effect above already covers initial load.
@@ -40,6 +41,16 @@ export default function ProductCatalog({
     loadProducts();
   }, [refreshSignal]);
 
+  // Offline-queued sales only deduct stock on the server once background
+  // sync runs (they aren't in the DB yet at the moment they're placed), so
+  // the immediate post-sale refresh above can still show pre-sale
+  // quantities. Refetch again whenever a background sync actually lands.
+  useEffect(() => {
+    const handleSynced = () => loadProducts();
+    window.addEventListener("tezipos:sales-synced", handleSynced);
+    return () => window.removeEventListener("tezipos:sales-synced", handleSynced);
+  }, [businessType, locationId]);
+
   const handleRefresh = async () => {
     if (!navigator.onLine) {
       setError("Cannot refresh while offline");
@@ -50,11 +61,11 @@ export default function ProductCatalog({
     try {
       if (businessType === "gas") {
         await Promise.all([
-          refreshCylinderBrandCache(),
-          refreshProductCache("accessory"),
+          refreshCylinderBrandCache(locationId),
+          refreshProductCache("accessory", locationId),
         ]);
       } else {
-        await refreshProductCache(businessType);
+        await refreshProductCache(businessType, locationId);
       }
       await loadProducts();
     } catch (err) {
@@ -71,8 +82,8 @@ export default function ProductCatalog({
     try {
       if (businessType === "gas") {
         const [brands, accessories] = await Promise.all([
-          loadCylinderBrands(),
-          loadCachedProducts("accessory"),
+          loadCylinderBrands(locationId),
+          loadCachedProducts("accessory", locationId),
         ]);
         setAllBrands(brands);
         const gasItems = brands.map((b) => ({
@@ -90,7 +101,7 @@ export default function ProductCatalog({
         }));
         setProducts([...gasItems, ...accessories]);
       } else {
-        const data = await loadCachedProducts(businessType);
+        const data = await loadCachedProducts(businessType, locationId);
         console.log("Catalog load:", { businessType, data });
         const filtered = Array.isArray(data)
           ? data.filter((p) => p.business_type === businessType)

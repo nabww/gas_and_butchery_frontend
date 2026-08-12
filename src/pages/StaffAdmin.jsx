@@ -31,6 +31,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
     business_access: ["butchery"],
     pin: "",
     can_redeem_points: false,
+    can_switch_location: false,
     is_active: true,
   };
 
@@ -46,6 +47,9 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   const [pin, setPin] = useState(defaults.pin || "");
   const [canRedeemPoints, setCanRedeemPoints] = useState(
     !!defaults.can_redeem_points,
+  );
+  const [canSwitchLocation, setCanSwitchLocation] = useState(
+    !!defaults.can_switch_location,
   );
   const [isActive, setIsActive] = useState(Boolean(defaults.is_active));
   const [saving, setSaving] = useState(false);
@@ -90,6 +94,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
         location_id: locationId ? Number(locationId) : null,
         business_access: businessAccess,
         can_redeem_points: canRedeemPoints,
+        can_switch_location: canSwitchLocation,
         is_active: isActive,
       };
 
@@ -110,15 +115,21 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   };
 
   return (
-    <div className="rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="rounded-2xl bg-surface2 border border-borderColor p-4 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-textPrimary text-sm font-semibold">
           {editing ? "Edit staff member" : "Add staff member"}
         </p>
         {editing && (
           <button
+            type="button"
             onClick={onCancel}
-            className="text-xs text-textMuted hover:text-textPrimary">
+            className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
             Cancel
           </button>
         )}
@@ -199,6 +210,16 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
             />
             Can redeem points
           </label>
+          {role === "supervisor" && (
+            <label className="flex items-center gap-2 text-xs text-textSecondary">
+              <input
+                type="checkbox"
+                checked={canSwitchLocation}
+                onChange={(e) => setCanSwitchLocation(e.target.checked)}
+              />
+              Can switch shops
+            </label>
+          )}
         </div>
       </div>
 
@@ -225,7 +246,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
 
       <div className="flex gap-2">
         <button
-          onClick={submit}
+          type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
           {saving
@@ -237,7 +258,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
               : "Create staff"}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 

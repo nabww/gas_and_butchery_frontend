@@ -454,6 +454,15 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
   const input =
     "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
 
+  // Rendered inside RegisterForm's own <form>, so this stays a <div> with a
+  // manual Enter handler rather than nesting a second <form> (invalid HTML).
+  const handleFieldKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!saving && consentGiven) submit();
+    }
+  };
+
   return (
     <div className="mt-1 p-3 rounded-lg bg-surface1 border border-borderColor space-y-2">
       <p className="text-textSecondary text-xs font-semibold">
@@ -464,12 +473,14 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
         placeholder="Phone (e.g. +254712345678)"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
+        onKeyDown={handleFieldKeyDown}
       />
       <input
         className={input}
         placeholder="Name (optional)"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        onKeyDown={handleFieldKeyDown}
       />
       <label className="flex items-start gap-2 text-xs text-textSecondary">
         <input
@@ -495,12 +506,14 @@ function NewCustomerInline({ initialPhone, onCreated, onCancel }) {
       {error && <p className="text-danger text-xs font-semibold">{error}</p>}
       <div className="flex gap-2">
         <button
+          type="button"
           onClick={submit}
           disabled={saving || !consentGiven}
           className="px-3 py-1.5 rounded-lg bg-primary text-onPrimary font-semibold text-xs disabled:opacity-50">
           {saving ? "Creating..." : "Create & select"}
         </button>
         <button
+          type="button"
           onClick={onCancel}
           className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary font-semibold text-xs hover:bg-surface3 hover:text-textPrimary">
           Cancel
@@ -553,7 +566,12 @@ function RegisterForm({ onRegistered }) {
     "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
 
   return (
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl bg-surface2 border border-borderColor p-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!saving) submit();
+      }}
+      className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl bg-surface2 border border-borderColor p-4">
       {selectedCustomer ? (
         <div className="md:col-span-1 flex items-center justify-between px-3 py-2 rounded-lg bg-surface1 border border-borderColor">
           <div>
@@ -563,6 +581,7 @@ function RegisterForm({ onRegistered }) {
             <p className="text-textMuted text-xs">{selectedCustomer.phone}</p>
           </div>
           <button
+            type="button"
             onClick={() => setSelectedCustomer(null)}
             className="text-textMuted hover:text-textPrimary text-xs">
             Change
@@ -583,6 +602,7 @@ function RegisterForm({ onRegistered }) {
                   {results.map((c) => (
                     <button
                       key={c.id}
+                      type="button"
                       onClick={() => {
                         setSelectedCustomer(c);
                         setResults([]);
@@ -632,7 +652,7 @@ function RegisterForm({ onRegistered }) {
         onChange={(e) => setCreditLimit(e.target.value)}
       />
       <button
-        onClick={submit}
+        type="submit"
         disabled={saving}
         className="px-4 py-2 rounded-lg bg-primary text-onPrimary font-semibold text-sm disabled:opacity-50">
         {saving ? "Registering..." : "Register corporate account"}
@@ -642,7 +662,7 @@ function RegisterForm({ onRegistered }) {
           {error}
         </p>
       )}
-    </div>
+    </form>
   );
 }
 
@@ -679,7 +699,12 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-surface1 border border-borderColor p-5 shadow-2xl">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="w-full max-w-md rounded-2xl bg-surface1 border border-borderColor p-5 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-textMuted">
@@ -690,6 +715,7 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
             </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="text-textMuted hover:text-textPrimary text-sm">
             ✕
@@ -777,17 +803,18 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
 
         <div className="mt-5 flex justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
             className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold">
             Cancel
           </button>
           <button
-            onClick={submit}
+            type="submit"
             className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold">
             Save payment
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
