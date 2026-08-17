@@ -35,15 +35,18 @@ npm run preview   # preview the production build locally
 ## Configuration
 
 No `.env` file is required for local dev (the Vite proxy handles API
-routing). If you need to point at a backend that isn't on `localhost:4000`
-(e.g. testing against a deployed backend), set:
+routing). For a production build, or to point at a backend that isn't on
+`localhost:4000` (e.g. testing against a deployed backend), copy
+`.env.example` to `.env.local` (or `.env.production.local`) and set:
 
 ```
 VITE_API_BASE=https://your-backend-host/api
 ```
 
-in a `.env.local` file at the frontend root — `src/lib/api.js` falls back to
-the dev proxy path (`/api`) or `<host>:4000/api` if this isn't set.
+`src/lib/api.js` falls back to the dev proxy path (`/api`) or
+`<host>:4000/api` if this isn't set — the latter fallback is unlikely to be
+correct for a real deployment, so set this explicitly when building for
+production.
 
 ## Project structure
 
