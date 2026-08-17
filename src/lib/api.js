@@ -553,8 +553,12 @@ export async function createPromoRule(rule) {
 export async function updatePromoRule(ruleId, rule) {
   return apiFetch(`/promotions/rules/${ruleId}`, { method: "PUT", body: JSON.stringify(rule) });
 }
-export async function getPromoPayouts(includePaid = false) {
-  return apiFetch(`/promotions/payouts${includePaid ? "?include_paid=true" : ""}`);
+export async function getPromoPayouts(includePaid = false, locationId) {
+  const params = new URLSearchParams();
+  if (includePaid) params.set("include_paid", "true");
+  if (locationId) params.set("location_id", locationId);
+  const query = params.toString();
+  return apiFetch(`/promotions/payouts${query ? `?${query}` : ""}`);
 }
 export async function markPromoPayoutPaid(payoutId) {
   return apiFetch(`/promotions/payouts/${payoutId}/paid`, { method: "PUT" });
@@ -632,8 +636,12 @@ export async function getSalesReport(startDate, endDate, locationId) {
   return apiFetch(`/reports/sales?${params.toString()}`);
 }
 
-export async function getLoyaltyReport() {
-  return apiFetch("/reports/loyalty");
+export async function getLoyaltyReport(startDate, endDate) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  const query = params.toString();
+  return apiFetch(`/reports/loyalty${query ? `?${query}` : ""}`);
 }
 
 export async function getCustomersReport() {
@@ -676,6 +684,16 @@ export async function getInsights(locationId) {
   const params = new URLSearchParams();
   if (locationId) params.set("location_id", locationId);
   return apiFetch(`/reports/insights?${params.toString()}`);
+}
+
+export async function getFastMovingProducts(startDate, endDate, locationId, sortBy = "revenue", limit = 20) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  if (locationId) params.set("location_id", locationId);
+  if (sortBy) params.set("sort_by", sortBy);
+  if (limit) params.set("limit", limit);
+  return apiFetch(`/reports/fast-movers?${params.toString()}`);
 }
 
 // ========== SYNC API ==========

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useActiveLocation } from "../contexts/LocationContext";
-import { getInsights } from "../lib/api";
+import { getInsights, getFastMovingProducts } from "../lib/api";
+
+const formatKes = (amount) =>
+  `KES ${Number(amount || 0).toLocaleString("en-KE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 const statusBadge = (status) => {
   const map = {
@@ -15,11 +23,30 @@ const statusBadge = (status) => {
 };
 
 export default function Insights({ onNavigate }) {
-  const { activeLocationId } = useActiveLocation();
+  const { activeLocationId, locations } = useActiveLocation();
+  // Cylinder sections are meaningless for a shop that doesn't run gas at
+  // all. An unrestricted shop (no business_types rows) or the "all
+  // locations" view still shows them, since gas may apply somewhere.
+  const activeLocation = locations.find((l) => String(l.id) === String(activeLocationId));
+  const showGasSections =
+    !activeLocationId ||
+    !activeLocation?.business_types?.length ||
+    activeLocation.business_types.includes("gas");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [atRisk, setAtRisk] = useState([]);
   const [restock, setRestock] = useState([]);
+
+  const [fastMoversStart, setFastMoversStart] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return d.toISOString().slice(0, 10);
+  });
+  const [fastMoversEnd, setFastMoversEnd] = useState(todayIso);
+  const [fastMoversSort, setFastMoversSort] = useState("revenue");
+  const [fastMovers, setFastMovers] = useState([]);
+  const [fastMoversLoading, setFastMoversLoading] = useState(true);
+  const [fastMoversError, setFastMoversError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +65,32 @@ export default function Insights({ onNavigate }) {
     };
   }, [activeLocationId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setFastMoversLoading(true);
+    setFastMoversError("");
+    getFastMovingProducts(fastMoversStart, fastMoversEnd, activeLocationId, fastMoversSort)
+      .then((data) => {
+        if (cancelled) return;
+        setFastMovers(data.products || []);
+      })
+      .catch((err) => setFastMoversError(err.message || "Failed to load fast-moving products."))
+      .finally(() => setFastMoversLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [fastMoversStart, fastMoversEnd, fastMoversSort, activeLocationId]);
+
   const urgentRestock = useMemo(() => restock.filter((r) => r.status === "urgent" || r.status === "low_stock"), [restock]);
   const soonRestock = useMemo(() => restock.filter((r) => r.status === "soon"), [restock]);
+
+  // Keep the section (and its date/sort controls) visible while a fetch is
+  // in flight -- including when the user just changed the date range from
+  // within it -- and only hide it once a load finishes with nothing found.
+  const showFastMovers = fastMoversLoading || fastMovers.length > 0;
+  const showAtRisk = atRisk.length > 0;
+  const showCylinderSections = showGasSections && restock.length > 0;
+  const hasAnyInsights = showFastMovers || showAtRisk || showCylinderSections;
 
   if (loading) {
     return (
@@ -75,6 +126,85 @@ export default function Insights({ onNavigate }) {
         <div className="mb-4 p-3 rounded-xl bg-danger/10 text-danger text-sm">{error}</div>
       )}
 
+      {!error && !hasAnyInsights && (
+        <p className="text-textSecondary text-sm">
+          Nothing to surface yet — insights appear here once there's enough sales/stock activity.
+        </p>
+      )}
+
+      {showFastMovers && (
+      <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-textPrimary font-bold">Fast-moving products</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={fastMoversStart}
+              onChange={(e) => setFastMoversStart(e.target.value)}
+              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+            <span className="text-textSecondary text-sm">to</span>
+            <input
+              type="date"
+              value={fastMoversEnd}
+              onChange={(e) => setFastMoversEnd(e.target.value)}
+              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+            <div className="flex gap-1 rounded-lg bg-surface1 border border-borderColor p-1">
+              {[
+                { key: "revenue", label: "By revenue" },
+                { key: "quantity", label: "By quantity" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setFastMoversSort(opt.key)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    fastMoversSort === opt.key
+                      ? "bg-primary text-onPrimary"
+                      : "text-textSecondary hover:text-textPrimary"
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {fastMoversError && (
+          <div className="mb-3 p-2 rounded-lg bg-danger/10 text-danger text-xs">{fastMoversError}</div>
+        )}
+        {fastMoversLoading ? (
+          <p className="text-textSecondary text-sm">Loading…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="text-textSecondary border-b border-borderColor">
+                  <th className="pb-2 pr-3">Product</th>
+                  <th className="pb-2 pr-3">Business</th>
+                  <th className="pb-2 pr-3 text-right">Quantity sold</th>
+                  <th className="pb-2 pr-3 text-right">Revenue</th>
+                  <th className="pb-2 text-right">Sales</th>
+                </tr>
+              </thead>
+              <tbody className="text-textPrimary">
+                {fastMovers.map((p, idx) => (
+                  <tr key={idx} className="border-b border-borderColor/50 last:border-0">
+                    <td className="py-2 pr-3 font-semibold">{p.item_name}</td>
+                    <td className="py-2 pr-3 capitalize text-textSecondary">{p.business_type}</td>
+                    <td className="py-2 pr-3 text-right">{p.total_quantity}</td>
+                    <td className="py-2 pr-3 text-right">{formatKes(p.total_revenue)}</td>
+                    <td className="py-2 text-right">{p.sale_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      )}
+
+      {showAtRisk && (
       <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
         <h2 className="text-textPrimary font-bold mb-4">
           At-risk customers
@@ -82,10 +212,7 @@ export default function Insights({ onNavigate }) {
             ({atRisk.length} with no purchase in 30+ days)
           </span>
         </h2>
-        {atRisk.length === 0 ? (
-          <p className="text-textSecondary text-sm">No at-risk customers found.</p>
-        ) : (
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="text-textSecondary border-b border-borderColor">
@@ -108,13 +235,13 @@ export default function Insights({ onNavigate }) {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+        </div>
       </section>
+      )}
 
+      {showCylinderSections && (
       <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
         <h2 className="text-textPrimary font-bold mb-4">Restock predictions</h2>
-
         {urgentRestock.length > 0 && (
           <div className="mb-5">
             <p className="text-textSecondary text-xs uppercase tracking-wide mb-2">Urgent or low stock</p>
@@ -147,10 +274,7 @@ export default function Insights({ onNavigate }) {
           </div>
         )}
 
-        {restock.length === 0 ? (
-          <p className="text-textSecondary text-sm">No stock data found.</p>
-        ) : (
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="text-textSecondary border-b border-borderColor">
@@ -175,9 +299,44 @@ export default function Insights({ onNavigate }) {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+        </div>
       </section>
+      )}
+
+      {showCylinderSections && (
+      <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
+        <h2 className="text-textPrimary font-bold mb-4">
+          Cylinder stock by location
+          <span className="ml-2 text-sm font-normal text-textSecondary">
+            (filled vs empty, per brand{!activeLocationId ? " and branch" : ""})
+          </span>
+        </h2>
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="text-textSecondary border-b border-borderColor">
+                  {!activeLocationId && <th className="pb-2 pr-3">Branch</th>}
+                  <th className="pb-2 pr-3">Brand</th>
+                  <th className="pb-2 pr-3 text-right">Filled</th>
+                  <th className="pb-2 pr-3 text-right">Empty</th>
+                  <th className="pb-2 text-right">Low-stock threshold</th>
+                </tr>
+              </thead>
+              <tbody className="text-textPrimary">
+                {restock.map((r) => (
+                  <tr key={`stock-${r.id}-${r.location_id}`} className="border-b border-borderColor/50 last:border-0">
+                    {!activeLocationId && <td className="py-2 pr-3">{r.location_name || "—"}</td>}
+                    <td className="py-2 pr-3">{r.brand} {r.weight_kg}kg</td>
+                    <td className="py-2 pr-3 text-right">{r.filled_qty}</td>
+                    <td className="py-2 pr-3 text-right">{r.empty_qty}</td>
+                    <td className="py-2 text-right">{r.low_stock_threshold}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+        </div>
+      </section>
+      )}
     </main>
   );
 }

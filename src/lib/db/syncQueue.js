@@ -42,12 +42,35 @@ export async function createLocalSale(staff, locationOverride) {
   return sale;
 }
 
+// Wipes an unfinished local draft sale and its line items. Safe to call on
+// any non-completed sale: only status === 'completed' sales are ever queued
+// for sync (see getAllPendingSnapshots), so a draft still sitting in
+// "pending" status was never uploaded and has nothing server-side to
+// reconcile.
+async function discardLocalSale(localSaleId) {
+  const items = await getByIndex("sale_items", "sale_local_id", localSaleId);
+  await Promise.all(items.map((item) => deleteRecord("sale_items", item.local_id)));
+  await deleteRecord("sales", localSaleId);
+  localStorage.removeItem("tezipos-current-sale-id");
+}
+
 export async function loadCurrentSale(staff, locationOverride) {
+  const intendedLocationId = locationOverride || staff?.locationId || 1;
   const currentId = localStorage.getItem("tezipos-current-sale-id");
   if (currentId) {
     const sale = await getById("sales", currentId);
     if (sale && sale.status !== "completed") {
-      return sale;
+      if (sale.location_id === intendedLocationId) {
+        return sale;
+      }
+      // Stale draft from a different shop -- e.g. an admin switched branches
+      // mid-cart, or the switcher's cached location changed since this cart
+      // was started. Continuing to add items to it would silently book the
+      // sale to the wrong branch even though the UI now shows the new one.
+      console.warn(
+        `Discarding stale local sale ${currentId} (location ${sale.location_id}) after switching to location ${intendedLocationId}`,
+      );
+      await discardLocalSale(currentId);
     }
   }
   return createLocalSale(staff, locationOverride);

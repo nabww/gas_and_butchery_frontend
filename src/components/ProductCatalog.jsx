@@ -18,6 +18,7 @@ export default function ProductCatalog({
   staffRole,
   refreshSignal = 0,
   locationId,
+  businessLabels = {},
 }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -153,6 +154,7 @@ export default function ProductCatalog({
             categories={allowedBusinesses}
             active={businessType}
             onSelect={onSelectBusiness}
+            labels={businessLabels}
           />
         )}
 
@@ -164,7 +166,7 @@ export default function ProductCatalog({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${businessType} products...`}
+            placeholder={`Search ${businessLabels[businessType] || businessType} products...`}
             className="flex-1 pl-11 pr-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
           <button

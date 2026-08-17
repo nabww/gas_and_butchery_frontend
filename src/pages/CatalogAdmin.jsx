@@ -142,8 +142,8 @@ function ProductForm({ editing, onSaved, onCancel }) {
             className={inputClass}
             value={pricingType}
             onChange={(e) => setPricingType(e.target.value)}>
-            <option value="fixed">Fixed</option>
-            <option value="weighted">Weighted</option>
+            <option value="fixed">Fixed (whole units, e.g. per piece)</option>
+            <option value="weighted">Fractionable (e.g. sold per kg)</option>
           </select>
         </div>
 

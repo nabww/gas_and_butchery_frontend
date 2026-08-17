@@ -35,7 +35,7 @@ const DEFAULT_BUSINESSES = ["butchery", "gas"];
 
 export default function Till({ staff, onNavigate }) {
   const isOnline = useOnlineStatus();
-  const { activeLocationId } = useActiveLocation();
+  const { activeLocationId, locations } = useActiveLocation();
   // A supervisor/admin who has switched shops via the nav sees that shop's
   // catalog and stock here too — useful for admins checking stock or
   // covering a rush at another branch. Cashiers (and anyone without switch
@@ -51,11 +51,42 @@ export default function Till({ staff, onNavigate }) {
   // here but still rings up sales under their own home location.
   const saleLocationOverride =
     staff?.role === "admin" ? activeLocationId : undefined;
+  // Silent misattribution risk: an admin's sales are tagged with whichever
+  // shop the switcher is set to, which can be leftover from browsing a
+  // different branch earlier. Surface it loudly so a sale never lands on
+  // the wrong branch's books without the admin noticing.
+  const isSellingElsewhere =
+    !!saleLocationOverride &&
+    String(saleLocationOverride) !== String(staff?.locationId);
+  const sellingLocationName = isSellingElsewhere
+    ? locations.find((l) => String(l.id) === String(saleLocationOverride))?.name
+    : null;
+  const homeLocationName = isSellingElsewhere
+    ? locations.find((l) => String(l.id) === String(staff?.locationId))?.name
+    : null;
+  // The shop actually being sold at/for -- same location the sale itself
+  // will be booked to (see saleLocationOverride above). A shop with no
+  // configured business_types is unrestricted (runs everything).
+  const effectiveLocationId = saleLocationOverride || staff?.locationId;
+  const effectiveLocation = useMemo(
+    () => locations.find((l) => String(l.id) === String(effectiveLocationId)),
+    [locations, effectiveLocationId],
+  );
+  const shopBusinessTypes = effectiveLocation?.business_types || [];
+  // Lets a shop rename "butchery" to whatever it actually sells (e.g.
+  // "Bakery") without touching the underlying business_type value used
+  // everywhere else (products, stock, staff access).
+  const businessLabels = effectiveLocation?.business_type_labels || {};
+
   const allowedBusinesses = useMemo(() => {
     const access = staff?.businessAccess || [];
-    const ordered = DEFAULT_BUSINESSES.filter((b) => access.includes(b));
-    return ordered.length > 0 ? ordered : DEFAULT_BUSINESSES;
-  }, [staff?.businessAccess]);
+    let ordered = DEFAULT_BUSINESSES.filter((b) => access.includes(b));
+    if (ordered.length === 0) ordered = DEFAULT_BUSINESSES;
+    if (shopBusinessTypes.length > 0) {
+      ordered = ordered.filter((b) => shopBusinessTypes.includes(b));
+    }
+    return ordered;
+  }, [staff?.businessAccess, shopBusinessTypes]);
 
   const [businessType, setBusinessType] = useState(allowedBusinesses[0]);
   const [loading, setLoading] = useState(false);
@@ -172,11 +203,27 @@ export default function Till({ staff, onNavigate }) {
         </div>
       </div>
 
+      {isSellingElsewhere && (
+        <div className="selling-elsewhere-banner">
+          ⚠ Selling as {sellingLocationName || `location ${saleLocationOverride}`} — your
+          home branch is {homeLocationName || "different"}. Sales made now will be booked
+          to that branch, not yours.
+        </div>
+      )}
+
       {error && <div className="error-banner">{error}</div>}
+
+      {allowedBusinesses.length === 0 && (
+        <div className="error-banner">
+          This shop doesn't run any of the businesses you have access to
+          ({(staff?.businessAccess || []).join(", ") || "none"}). Ask an admin to update
+          your access or this shop's configured businesses.
+        </div>
+      )}
 
       {loading && <div className="loading">Initializing sale...</div>}
 
-      {!loading && (
+      {!loading && allowedBusinesses.length > 0 && (
         <div className="till-content">
           {/* Left pane: Product catalog */}
           <div className="left-pane">
@@ -187,6 +234,7 @@ export default function Till({ staff, onNavigate }) {
               staffRole={staff?.role}
               refreshSignal={catalogRefreshKey}
               locationId={catalogLocationId}
+              businessLabels={businessLabels}
             />
           </div>
 

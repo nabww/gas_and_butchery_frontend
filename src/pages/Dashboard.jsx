@@ -10,7 +10,11 @@ import {
   getTopCustomersReport,
   listLocations,
   getDailyTrend,
+  getPromoPayouts,
+  markPromoPayoutPaid,
+  markPromoPayoutUnfulfilled,
 } from "../lib/api";
+import PayoutActionModal from "../components/PayoutActionModal";
 
 const formatKes = (amount) =>
   `KES ${Number(amount || 0).toLocaleString("en-KE", {
@@ -122,6 +126,10 @@ export default function Dashboard({ onNavigate }) {
   const [locations, setLocations] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
   const [trend, setTrend] = useState([]);
+  const [pendingRewards, setPendingRewards] = useState([]);
+  const [selectedPayout, setSelectedPayout] = useState(null);
+  const [payoutError, setPayoutError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const date = useMemo(() => todayIso(), []);
   const prevDate = useMemo(() => {
@@ -153,10 +161,11 @@ export default function Dashboard({ onNavigate }) {
           topCustomersData,
           locationsData,
           trendData,
+          pendingRewardsData,
         ] = await Promise.all([
           getSalesReport(date, date, activeLocationId).catch(() => null),
           getSalesReport(prevDate, prevDate, activeLocationId).catch(() => null),
-          getLoyaltyReport().catch(() => null),
+          getLoyaltyReport(date, date).catch(() => null),
           getArAgingReport().catch(() => null),
           getLedgerReport(date, date, activeLocationId).catch(() => null),
           getLowStockAlerts(activeLocationId).catch(() => []),
@@ -164,6 +173,10 @@ export default function Dashboard({ onNavigate }) {
           getTopCustomersReport(date, date, activeLocationId).catch(() => ({ customers: [] })),
           listLocations().catch(() => []),
           getDailyTrend(14, activeLocationId).catch(() => ({ points: [] })),
+          // Not date-scoped on purpose -- a pending cashback/reward from a
+          // few days ago is still owed to the customer today, so the owner
+          // needs to see it here regardless of when it was won.
+          getPromoPayouts(false, activeLocationId).catch(() => []),
         ]);
         if (cancelled) return;
         setSales(salesData);
@@ -177,6 +190,7 @@ export default function Dashboard({ onNavigate }) {
         setLocations(locationsData || []);
         setRecentSales((salesData?.sales || []).slice(0, 5));
         setTrend(trendData?.points || []);
+        setPendingRewards(pendingRewardsData || []);
       } catch (err) {
         setError(err.message || "Failed to load dashboard.");
       } finally {
@@ -188,7 +202,31 @@ export default function Dashboard({ onNavigate }) {
     return () => {
       cancelled = true;
     };
-  }, [date, activeLocationId]);
+  }, [date, activeLocationId, refreshKey]);
+
+  const handleIssuePayout = async () => {
+    if (!selectedPayout) return;
+    setPayoutError("");
+    try {
+      await markPromoPayoutPaid(selectedPayout.id);
+      setSelectedPayout(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setPayoutError(err.message || "Failed to mark reward as fulfilled.");
+    }
+  };
+
+  const handleUnfulfilledPayout = async () => {
+    if (!selectedPayout) return;
+    setPayoutError("");
+    try {
+      await markPromoPayoutUnfulfilled(selectedPayout.id);
+      setSelectedPayout(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setPayoutError(err.message || "Failed to mark reward as unfulfilled.");
+    }
+  };
 
   const revenue = sales?.summary?.totalRevenue || 0;
   const transactions = sales?.summary?.totalSales || 0;
@@ -196,14 +234,30 @@ export default function Dashboard({ onNavigate }) {
   const mpesa = sales?.summary?.byMethod?.mpesa || 0;
   const account = sales?.summary?.byMethod?.account || 0;
   const discounts = sales?.summary?.totalDiscount || 0;
-  const loyaltyLiability = loyalty?.totalLiability || 0;
-  const arBalance = ar?.totalOutstanding || 0;
+  const loyaltyLiability = loyalty?.dailyLiability || 0;
   const overdue = (ar?.buckets?.["1to30"] || 0) + (ar?.buckets?.["31to60"] || 0) + (ar?.buckets?.["over60"] || 0);
+  const income = ledger?.income || {};
   const expenses = ledger?.expenses || {};
-  const pendingPromo = (expenses?.pending || 0);
-  const pendingPromoCount = (expenses?.pendingCount || 0);
-  const redemptions = expenses?.rewards || 0;
-  const redemptionCount = expenses?.rewardsCount || 0;
+  // Credit sold today that hasn't been collected yet -- shown as negative
+  // since it's money extended, not money in hand.
+  const creditBalance = -(income?.creditExtended || 0);
+  const totalIncome = ledger?.netIncome || 0;
+  // Backlog, not a daily flow figure -- a pending payout from days ago is
+  // still outstanding today, so this is derived from the full pending list
+  // (same data backing the "Pending rewards & cashback" section below)
+  // rather than the date-scoped ledger totals, which would silently drop
+  // anything not won today.
+  const pendingPromo = pendingRewards.reduce(
+    (sum, p) => sum + Number(p.cashback_amount || p.cost_value || 0),
+    0,
+  );
+  const pendingPromoCount = pendingRewards.length;
+  // Combines catalog reward redemptions with promo prize/cashback wins that
+  // were marked paid/issued today -- previously only counted the catalog
+  // table, so a prize or cashback actually handed to a customer today could
+  // silently be missing from this figure.
+  const redemptions = expenses?.rewardsIssued || 0;
+  const redemptionCount = expenses?.rewardsIssuedCount || 0;
   const prevRevenue = prevSales?.summary?.totalRevenue || 0;
   const revenueChange = prevRevenue === 0 ? 0 : ((revenue - prevRevenue) / prevRevenue) * 100;
 
@@ -230,7 +284,9 @@ export default function Dashboard({ onNavigate }) {
       items.push(`${pendingPromoCount} promo payout(s) totaling ${formatKes(pendingPromo)} are still pending.`);
     }
     if (discounts > revenue * 0.15) {
-      items.push("Today's discounts exceed 15% of revenue — review discount patterns.");
+      items.push(
+        "Today's discounts (manual + loyalty points redeemed) exceed 15% of revenue — review discount patterns.",
+      );
     }
     if (mpesa > 0 && mpesa + cash + account === 0) {
       // unreachable, but kept for safety
@@ -291,21 +347,41 @@ export default function Dashboard({ onNavigate }) {
       )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Today's revenue" value={formatKes(revenue)} subtext={`${transactions} transactions`} />
+        <KpiCard label="Total sales" value={formatKes(revenue)} subtext={`${transactions} transactions, incl. credit`} />
         <KpiCard label="Cash" value={formatKes(cash)} />
         <KpiCard label="M-Pesa" value={formatKes(mpesa)} />
-        <KpiCard label="Today's P/L" value={formatKes(ledger?.netIncome || 0)} tone={(ledger?.netIncome || 0) >= 0 ? "success" : "danger"} />
+        <KpiCard
+          label="Total income"
+          value={formatKes(totalIncome)}
+          subtext="Cash/M-Pesa + collections, less today's costs"
+          tone={totalIncome >= 0 ? "success" : "danger"}
+        />
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Discounts" value={formatKes(discounts)} tone="warning" />
-        <KpiCard label="Loyalty liability" value={formatKes(loyaltyLiability)} tone="warning" />
+        <KpiCard
+          label="Discounts"
+          value={formatKes(discounts)}
+          subtext="Manual discounts + loyalty points redeemed at checkout"
+          tone="warning"
+        />
+        <KpiCard
+          label="Today's loyalty liability"
+          value={formatKes(loyaltyLiability)}
+          subtext="Net new points value earned today"
+          tone={loyaltyLiability > 0 ? "warning" : "default"}
+        />
         <KpiCard label="Pending promo payouts" value={formatKes(pendingPromo)} subtext={`${pendingPromoCount} pending`} tone="danger" />
         <KpiCard label="Reward redemptions" value={formatKes(redemptions)} subtext={`${redemptionCount} redemptions`} tone="success" />
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="AR balance" value={formatKes(arBalance)} subtext={`${formatKes(overdue)} overdue`} tone={overdue > 0 ? "danger" : "default"} />
+        <KpiCard
+          label="Credit balance"
+          value={formatKes(creditBalance)}
+          subtext={`${income?.creditExtendedCount || 0} credit sale(s) today, unpaid`}
+          tone={creditBalance < 0 ? "warning" : "default"}
+        />
         <KpiCard label="Low-stock items" value={lowStock.length} tone={lowStock.length > 0 ? "warning" : "default"} />
         <KpiCard label="Unresolved oversells" value={oversells.length} tone={oversells.length > 0 ? "danger" : "default"} />
         <KpiCard label="Top customer today" value={formatKes(topCustomers[0]?.total_spend || 0)} subtext={topCustomers[0]?.name || "No sales yet"} />
@@ -370,6 +446,52 @@ export default function Dashboard({ onNavigate }) {
           )}
         </section>
       )}
+
+      {(pendingRewards.length > 0 || payoutError) && (
+      <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mt-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-textPrimary font-bold">
+            Pending rewards & cashback{activeLocationId ? ` — ${activeLocationName}` : ""}
+          </h2>
+          <span className="text-textSecondary text-xs">
+            {pendingRewards.length} awaiting action
+          </span>
+        </div>
+        {payoutError && (
+          <p className="mb-3 p-2 rounded-lg bg-danger/10 text-danger text-xs">{payoutError}</p>
+        )}
+        <div className="space-y-2">
+            {pendingRewards.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedPayout(p)}
+                className="w-full p-3 rounded-xl bg-surface1 border border-borderColor flex justify-between items-center text-sm text-left hover:border-borderStrong hover:bg-surface3 transition-all"
+              >
+                <span className="text-textPrimary">
+                  {p.customer_name || p.customer_phone || "Customer"} —{" "}
+                  {p.type === "cashback"
+                    ? `Cashback KES ${Number(p.cashback_amount || 0).toFixed(2)}`
+                    : p.reward_name || "Reward"}{" "}
+                  {p.type === "prize" && `(KES ${Number(p.cost_value || 0).toFixed(2)})`}
+                  <span className="text-textSecondary text-xs ml-2">
+                    {p.location_name || "Unknown branch"} ·{" "}
+                    {new Date(p.created_at).toLocaleDateString("en-KE")}
+                  </span>
+                </span>
+                <span className="text-textSecondary text-xs">Action</span>
+              </button>
+            ))}
+        </div>
+      </section>
+      )}
+
+      <PayoutActionModal
+        payout={selectedPayout}
+        onClose={() => setSelectedPayout(null)}
+        onIssue={handleIssuePayout}
+        onUnfulfilled={handleUnfulfilledPayout}
+      />
     </main>
   );
 }

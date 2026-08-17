@@ -108,6 +108,16 @@
   transform: translateY(0);
 }
 
+.selling-elsewhere-banner {
+  background-color: var(--status-warning);
+  color: white;
+  padding: 10px 16px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
 .error-banner {
   background-color: var(--status-error);
   color: white;

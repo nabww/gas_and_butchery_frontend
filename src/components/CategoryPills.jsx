@@ -1,17 +1,18 @@
 import { memo } from "react";
 
 const CATEGORY_META = {
-  butchery: { icon: "🥩", label: "Butchery" },
+  butchery: { icon: "🥩", label: "Retail" },
   gas: { icon: "🔥", label: "Gas" },
   drinks: { icon: "🥤", label: "Drinks" },
   dairy: { icon: "🥛", label: "Dairy" },
 };
 
-function CategoryPills({ categories, active, onSelect }) {
+function CategoryPills({ categories, active, onSelect, labels = {} }) {
   return (
     <div className="flex flex-wrap gap-2" role="tablist" aria-label="Product categories">
       {categories.map((type) => {
         const meta = CATEGORY_META[type] || { icon: "", label: type };
+        const label = labels[type] || meta.label;
         const isActive = type === active;
         return (
           <button
@@ -25,7 +26,7 @@ function CategoryPills({ categories, active, onSelect }) {
                 : "bg-surface2 text-textSecondary border-borderColor hover:border-borderStrong hover:text-textPrimary"
             }`}>
             <span aria-hidden="true">{meta.icon}</span>
-            <span className="capitalize">{meta.label}</span>
+            <span className="capitalize">{label}</span>
           </button>
         );
       })}

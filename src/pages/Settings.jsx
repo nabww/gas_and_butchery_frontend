@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   getBusinessConfig,
   updateBusinessConfig,
@@ -371,7 +371,7 @@ function ShopsSettingsSection({ setMessage }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ name: "", address: "", is_active: true });
+  const [form, setForm] = useState({ name: "", address: "", is_active: true, business_types: [] });
   const [saving, setSaving] = useState(false);
   const [mpesaForm, setMpesaForm] = useState({
     environment: "sandbox",
@@ -401,17 +401,35 @@ function ShopsSettingsSection({ setMessage }) {
 
   const startAdd = () => {
     setEditingId("new");
-    setForm({ name: "", address: "", is_active: true });
+    setForm({ name: "", address: "", is_active: true, business_types: [], business_type_labels: {} });
   };
 
   const startEdit = (loc) => {
     setEditingId(loc.id);
-    setForm({ name: loc.name || "", address: loc.address || "", is_active: !!loc.is_active });
+    setForm({
+      name: loc.name || "",
+      address: loc.address || "",
+      is_active: !!loc.is_active,
+      business_types: loc.business_types || [],
+      business_type_labels: loc.business_type_labels || {},
+    });
   };
 
   const cancel = () => {
     setEditingId(null);
-    setForm({ name: "", address: "", is_active: true });
+    setForm({ name: "", address: "", is_active: true, business_types: [], business_type_labels: {} });
+  };
+
+  const toggleBusinessType = (type) => {
+    setForm((prev) => {
+      const has = prev.business_types.includes(type);
+      return {
+        ...prev,
+        business_types: has
+          ? prev.business_types.filter((t) => t !== type)
+          : [...prev.business_types, type],
+      };
+    });
   };
 
   const save = async (e) => {
@@ -425,16 +443,17 @@ function ShopsSettingsSection({ setMessage }) {
     try {
       if (editingId === "new") {
         await createLocation(form);
-        setMessage("Shop created. Refresh the page to see it in the shop switcher.");
       } else {
         await updateLocation(editingId, form);
-        setMessage("Shop updated.");
       }
-      await loadLocations();
-      cancel();
+      // The shop switcher (nav) and Till's business-type restrictions read
+      // from LocationContext, which is only loaded once on app mount --
+      // without a reload, a saved shop's new/changed businesses wouldn't
+      // take effect anywhere except this settings list until the next
+      // manual refresh.
+      window.location.reload();
     } catch (err) {
       setMessage(err.message || "Failed to save shop.");
-    } finally {
       setSaving(false);
     }
   };
@@ -559,6 +578,54 @@ function ShopsSettingsSection({ setMessage }) {
             />
             Active
           </label>
+          <div>
+            <label className={label}>Businesses run at this shop</label>
+            <p className="text-textMuted text-xs mt-1 mb-2">
+              Leave both unchecked to allow every business (default). Gas refills have their
+              own stock/exchange workflow, so branches that don't sell gas can hide it entirely.
+            </p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-textPrimary text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.business_types.includes("butchery")}
+                  onChange={() => toggleBusinessType("butchery")}
+                  disabled={!isAdmin || saving}
+                />
+                Retail
+              </label>
+              <label className="flex items-center gap-2 text-textPrimary text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.business_types.includes("gas")}
+                  onChange={() => toggleBusinessType("gas")}
+                  disabled={!isAdmin || saving}
+                />
+                Gas
+              </label>
+            </div>
+            {form.business_types.includes("butchery") && (
+              <div className="mt-3">
+                <label className={label}>Custom name for this business (optional)</label>
+                <input
+                  className={input}
+                  value={form.business_type_labels.butchery || ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      business_type_labels: { ...form.business_type_labels, butchery: e.target.value },
+                    })
+                  }
+                  placeholder="Retail"
+                  disabled={!isAdmin || saving}
+                />
+                <p className="text-textMuted text-xs mt-1">
+                  Renames "Retail" to whatever this shop actually sells (e.g. "Butchery",
+                  "Bakery", "Hardware") wherever it's shown at the till. Leave blank to keep "Retail".
+                </p>
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             {isAdmin && (
               <button
@@ -578,38 +645,73 @@ function ShopsSettingsSection({ setMessage }) {
         </form>
       )}
 
-      <div className="space-y-3">
-        {locations.map((loc) => (
-          <div key={loc.id} className="rounded-xl bg-surface1 border border-borderColor p-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-textPrimary font-semibold">{loc.name}</p>
-                <p className="text-textSecondary text-sm">{loc.address || "No address"}</p>
-                <span
-                  className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${
-                    loc.is_active ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-                  }`}>
-                  {loc.is_active ? "Active" : "Inactive"}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {isAdmin && (
-                  <button
-                    onClick={() => startEdit(loc)}
-                    className="px-3 py-1 rounded-lg border border-borderColor text-textSecondary text-xs hover:bg-surface2">
-                    Edit
-                  </button>
-                )}
-                <button
-                  onClick={() => loadMpesaConfig(loc.id)}
-                  className="px-3 py-1 rounded-lg border border-borderColor text-primary text-xs hover:bg-surface2">
-                  M-Pesa config
-                </button>
-              </div>
-            </div>
-
-            {selectedMpesaLocationId === loc.id && (
-              <form onSubmit={saveMpesaConfig} className="mt-4 pt-4 border-t border-borderColor space-y-4">
+      <div className="rounded-2xl overflow-hidden border border-borderColor">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface1 text-textSecondary">
+              <tr>
+                <th className="p-3 text-left font-semibold">Name</th>
+                <th className="p-3 text-left font-semibold">Address</th>
+                <th className="p-3 text-left font-semibold">Businesses</th>
+                <th className="p-3 text-left font-semibold">Status</th>
+                <th className="p-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {locations.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-textMuted text-sm">
+                    No shops yet.
+                  </td>
+                </tr>
+              ) : (
+                locations.map((loc) => (
+                  <Fragment key={loc.id}>
+                    <tr className="border-t border-borderColor text-textPrimary">
+                      <td className="p-3 font-semibold">{loc.name}</td>
+                      <td className="p-3 text-textSecondary">{loc.address || "No address"}</td>
+                      <td className="p-3">
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-surface2 text-textSecondary capitalize">
+                          {loc.business_types && loc.business_types.length > 0
+                            ? loc.business_types
+                                .map((t) => loc.business_type_labels?.[t] || (t === "butchery" ? "Retail" : t))
+                                .join(" & ")
+                            : "Retail & Gas"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                            loc.is_active ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                          }`}>
+                          {loc.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {isAdmin && (
+                            <button
+                              onClick={() => startEdit(loc)}
+                              className="px-3 py-1 rounded-lg border border-borderColor text-textSecondary text-xs hover:bg-surface2">
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            onClick={() =>
+                              selectedMpesaLocationId === loc.id
+                                ? closeMpesaConfig()
+                                : loadMpesaConfig(loc.id)
+                            }
+                            className="px-3 py-1 rounded-lg border border-borderColor text-primary text-xs hover:bg-surface2">
+                            {selectedMpesaLocationId === loc.id ? "Close" : "M-Pesa config"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {selectedMpesaLocationId === loc.id && (
+                      <tr className="border-t border-borderColor">
+                        <td colSpan={5} className="p-4 bg-surface1">
+                          <form onSubmit={saveMpesaConfig} className="space-y-4">
                 <p className="text-textPrimary font-semibold text-sm">M-Pesa config for {loc.name}</p>
                 <p className="text-textMuted text-xs">
                   Leave fields blank to use the global .env M-Pesa configuration.
@@ -688,10 +790,16 @@ function ShopsSettingsSection({ setMessage }) {
                     </button>
                   </div>
                 )}
-              </form>
-            )}
-          </div>
-        ))}
+                          </form>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

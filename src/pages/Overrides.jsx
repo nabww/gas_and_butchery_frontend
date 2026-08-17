@@ -53,6 +53,7 @@ export default function Overrides() {
               <thead className="bg-surface2 text-textSecondary">
                 <tr>
                   <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Branch</th>
                   <th className="p-3 text-left">Customer</th>
                   <th className="p-3 text-right">Total</th>
                   <th className="p-3 text-right">Discount</th>
@@ -63,6 +64,7 @@ export default function Overrides() {
                 {creditRows.map((row) => (
                   <tr key={row.id} className="border-t border-borderColor text-textPrimary">
                     <td className="p-3">{new Date(row.created_at).toLocaleString("en-KE")}</td>
+                    <td className="p-3">{row.location_name || "—"}</td>
                     <td className="p-3">{row.customer_name || row.customer_phone || "—"}</td>
                     <td className="p-3 text-right">KES {Number(row.total || 0).toFixed(2)}</td>
                     <td className="p-3 text-right">KES {Number(row.discount_amount || 0).toFixed(2)}</td>
@@ -88,6 +90,7 @@ export default function Overrides() {
               <thead className="bg-surface2 text-textSecondary">
                 <tr>
                   <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Branch</th>
                   <th className="p-3 text-left">Customer</th>
                   <th className="p-3 text-left">Type</th>
                   <th className="p-3 text-right">Value</th>
@@ -97,6 +100,7 @@ export default function Overrides() {
                 {payoutRows.map((row) => (
                   <tr key={row.id} className="border-t border-borderColor text-textPrimary">
                     <td className="p-3">{new Date(row.created_at).toLocaleString("en-KE")}</td>
+                    <td className="p-3">{row.location_name || "—"}</td>
                     <td className="p-3">{row.customer_name || row.customer_phone || "—"}</td>
                     <td className="p-3 capitalize">{row.type}</td>
                     <td className="p-3 text-right">

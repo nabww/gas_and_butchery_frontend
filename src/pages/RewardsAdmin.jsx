@@ -273,6 +273,9 @@ export default function RewardsAdmin() {
                 {p.customer_name || p.customer_phone || "Customer"} —{" "}
                 {p.reward_name || "Reward"} (KES{" "}
                 {Number(p.cost_value || 0).toFixed(2)})
+                <span className="text-textSecondary text-xs ml-2">
+                  {p.location_name || "Unknown branch"}
+                </span>
               </span>
               <span className="text-textSecondary text-xs">Action</span>
             </button>

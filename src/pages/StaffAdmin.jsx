@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   listLocations,
   listStaff,
@@ -23,11 +23,19 @@ function formatDate(value) {
 }
 
 function StaffForm({ locations, editing, onSaved, onCancel }) {
+  // Inactive shops shouldn't be offered for a new/changed assignment, but a
+  // staff member already assigned to one that's since gone inactive still
+  // needs their current location visible here so editing them doesn't
+  // silently reassign them to somewhere else.
+  const assignableLocations = locations.filter(
+    (loc) => loc.is_active || String(loc.id) === String(editing?.location_id),
+  );
+
   const defaults = editing || {
     name: "",
     phone: "",
     role: "cashier",
-    location_id: locations[0]?.id || "",
+    location_id: assignableLocations[0]?.id || "",
     business_access: ["butchery"],
     pin: "",
     can_redeem_points: false,
@@ -39,7 +47,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   const [phone, setPhone] = useState(defaults.phone || "");
   const [role, setRole] = useState(defaults.role || "cashier");
   const [locationId, setLocationId] = useState(
-    defaults.location_id ?? locations[0]?.id ?? "",
+    defaults.location_id ?? assignableLocations[0]?.id ?? "",
   );
   const [businessAccess, setBusinessAccess] = useState(
     defaults.business_access || ["butchery"],
@@ -56,8 +64,8 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!editing && locations[0]) {
-      setLocationId(locations[0].id);
+    if (!editing && assignableLocations[0]) {
+      setLocationId(assignableLocations[0].id);
     }
   }, [locations, editing]);
 
@@ -172,9 +180,10 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
             className={inputClass}
             value={locationId}
             onChange={(e) => setLocationId(e.target.value)}>
-            {locations.map((location) => (
+            {assignableLocations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.name}
+                {!location.is_active ? " (inactive)" : ""}
               </option>
             ))}
           </select>
@@ -407,85 +416,110 @@ export default function StaffAdmin({ staffRole }) {
         {loading ? (
           <p className="text-textMuted text-xs">Loading staff...</p>
         ) : (
-          <div className="space-y-2">
-            {filteredStaff.length === 0 ? (
-              <p className="text-textMuted text-xs">
-                No staff match the current filters.
-              </p>
-            ) : (
-              filteredStaff.map((member) => (
-                <div key={member.id}>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-xl border border-borderColor bg-surface1 p-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-textPrimary font-semibold text-sm">
-                          {member.name}
-                        </p>
-                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wide">
-                          {member.role}
-                        </span>
-                        {!member.is_active && (
-                          <span className="px-2 py-0.5 rounded-full bg-danger/10 text-danger text-[10px] font-semibold uppercase tracking-wide">
-                            Inactive
-                          </span>
+          <div className="rounded-2xl overflow-hidden border border-borderColor">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface1 text-textSecondary">
+                  <tr>
+                    <th className="p-3 text-left font-semibold">Name</th>
+                    <th className="p-3 text-left font-semibold">Role</th>
+                    <th className="p-3 text-left font-semibold">Phone</th>
+                    <th className="p-3 text-left font-semibold">Location</th>
+                    <th className="p-3 text-left font-semibold">Business access</th>
+                    <th className="p-3 text-left font-semibold">Status</th>
+                    <th className="p-3 text-right font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStaff.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-4 text-center text-textMuted text-xs">
+                        No staff match the current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStaff.map((member) => (
+                      <Fragment key={member.id}>
+                        <tr className="border-t border-borderColor text-textPrimary">
+                          <td className="p-3 font-semibold">{member.name}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wide">
+                              {member.role}
+                            </span>
+                          </td>
+                          <td className="p-3 text-textSecondary">{member.phone || "No phone"}</td>
+                          <td className="p-3 text-textSecondary">
+                            {member.location_name || "Unassigned location"}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1.5">
+                              {(member.business_access || []).map((access) => (
+                                <span
+                                  key={access}
+                                  className="px-2 py-0.5 rounded-full bg-surface3 text-textSecondary text-[10px] font-semibold uppercase tracking-wide">
+                                  {access}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {member.is_active ? (
+                              <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-semibold uppercase tracking-wide">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-danger/10 text-danger text-[10px] font-semibold uppercase tracking-wide">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setExpandedId((current) =>
+                                    current === member.id ? null : member.id,
+                                  );
+                                  setEditing(member);
+                                }}
+                                className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
+                                {expandedId === member.id ? "Close" : "Edit"}
+                              </button>
+                              {member.is_active && (
+                                <button
+                                  onClick={() => deactivate(member.id)}
+                                  className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
+                                  Deactivate
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedId === member.id && (
+                          <tr className="border-t border-borderColor">
+                            <td colSpan={7} className="p-3 bg-surface1">
+                              <StaffForm
+                                locations={locations}
+                                editing={editing}
+                                onSaved={() => {
+                                  setExpandedId(null);
+                                  setEditing(null);
+                                  fetchData();
+                                }}
+                                onCancel={() => {
+                                  setExpandedId(null);
+                                  setEditing(null);
+                                }}
+                              />
+                            </td>
+                          </tr>
                         )}
-                      </div>
-                      <p className="text-textMuted text-xs mt-1">
-                        {member.phone || "No phone"} ·{" "}
-                        {member.location_name || "Unassigned location"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {(member.business_access || []).map((access) => (
-                          <span
-                            key={access}
-                            className="px-2 py-0.5 rounded-full bg-surface3 text-textSecondary text-[10px] font-semibold uppercase tracking-wide">
-                            {access}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setExpandedId((current) =>
-                            current === member.id ? null : member.id,
-                          );
-                          setEditing(member);
-                        }}
-                        className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
-                        {expandedId === member.id ? "Close" : "Edit"}
-                      </button>
-                      {member.is_active && (
-                        <button
-                          onClick={() => deactivate(member.id)}
-                          className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">
-                          Deactivate
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {expandedId === member.id && (
-                    <div className="mt-2">
-                      <StaffForm
-                        locations={locations}
-                        editing={editing}
-                        onSaved={() => {
-                          setExpandedId(null);
-                          setEditing(null);
-                          fetchData();
-                        }}
-                        onCancel={() => {
-                          setExpandedId(null);
-                          setEditing(null);
-                        }}
-                      />
-                    </div>
+                      </Fragment>
+                    ))
                   )}
-                </div>
-              ))
-            )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

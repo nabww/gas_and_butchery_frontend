@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   listCorporateAccounts,
   createCorporateAccount,
@@ -1443,64 +1443,98 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
           Per-transaction invoices are generated from the sale/receipt itself
           once a sale is charged to this account.
         </p>
-        <div className="space-y-1">
-          {invoices.length === 0 && (
-            <p className="text-textMuted text-xs">No invoices yet.</p>
-          )}
-          {invoices.map((inv) => (
-            <div
-              key={inv.id}
-              className="flex items-center justify-between text-sm p-2 rounded-lg bg-surface1 border border-borderColor">
-              <span className="text-textPrimary">
-                #{inv.id} · {inv.type} · {formatKes(inv.total)}
-                {inv.covers_up_to && (
-                  <span className="text-textMuted">
-                    {" "}
-                    (up to {inv.covers_up_to.slice(0, 10)})
-                  </span>
+        <div className="rounded-xl overflow-hidden border border-borderColor">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface2 text-textSecondary">
+                <tr>
+                  <th className="p-2 text-left font-semibold">Invoice</th>
+                  <th className="p-2 text-left font-semibold">Type</th>
+                  <th className="p-2 text-right font-semibold">Total</th>
+                  <th className="p-2 text-left font-semibold">Status</th>
+                  <th className="p-2 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-3 text-center text-textMuted text-xs">
+                      No invoices yet.
+                    </td>
+                  </tr>
+                ) : (
+                  invoices.map((inv) => (
+                    <tr key={inv.id} className="border-t border-borderColor text-textPrimary">
+                      <td className="p-2">
+                        #{inv.id}
+                        {inv.covers_up_to && (
+                          <span className="text-textMuted">
+                            {" "}
+                            (up to {inv.covers_up_to.slice(0, 10)})
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2 capitalize">{inv.type}</td>
+                      <td className="p-2 text-right">
+                        {formatKes(inv.total)}
+                        {inv.status === "partial" && (
+                          <span className="text-warning block text-xs">
+                            {formatKes(Math.max(0, parseFloat(inv.total || 0) - parseFloat(inv.paid_amount || 0)))} due
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <span
+                          className={`text-xs font-semibold capitalize ${
+                            inv.status === "paid"
+                              ? "text-success"
+                              : inv.status === "partial"
+                                ? "text-warning"
+                                : inv.status === "consolidated"
+                                  ? "text-textMuted"
+                                  : "text-danger"
+                          }`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                          <button
+                            onClick={() => setSelectedInvoice(inv)}
+                            className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                            View invoice
+                          </button>
+                          {inv.status !== "consolidated" && (
+                            <button
+                              onClick={() => printInvoice(inv)}
+                              className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                              PDF
+                            </button>
+                          )}
+                          {inv.status !== "paid" && inv.status !== "consolidated" && (
+                            <button
+                              onClick={() =>
+                                setPaymentModal({
+                                  open: true,
+                                  invoiceId: inv.id,
+                                  amountDue: Math.max(
+                                    0,
+                                    parseFloat(inv.total || 0) - parseFloat(inv.paid_amount || 0),
+                                  ),
+                                })
+                              }
+                              className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
+                              Record payment
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </span>
-              <span className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-semibold capitalize ${
-                    inv.status === "paid"
-                      ? "text-success"
-                      : inv.status === "partial"
-                        ? "text-warning"
-                        : inv.status === "consolidated"
-                          ? "text-textMuted"
-                          : "text-danger"
-                  }`}>
-                  {inv.status}
-                </span>
-                <button
-                  onClick={() => setSelectedInvoice(inv)}
-                  className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
-                  View invoice
-                </button>
-                {inv.status !== "consolidated" && (
-                  <button
-                    onClick={() => printInvoice(inv)}
-                    className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
-                    PDF
-                  </button>
-                )}
-                {inv.status !== "paid" && inv.status !== "consolidated" && (
-                  <button
-                    onClick={() =>
-                      setPaymentModal({
-                        open: true,
-                        invoiceId: inv.id,
-                        amountDue: inv.total,
-                      })
-                    }
-                    className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold hover:bg-surface3 shrink-0">
-                    Record payment
-                  </button>
-                )}
-              </span>
-            </div>
-          ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1574,43 +1608,63 @@ export default function CorporateAccountsAdmin() {
         </>
       )}
 
-      <section className="mt-6 space-y-2">
-        {accounts.length === 0 && (
-          <p className="text-textMuted text-sm">
-            No corporate accounts registered yet.
-          </p>
-        )}
-        {accounts.map((account) => (
-          <div key={account.id}>
-            <div className="p-3 rounded-xl bg-surface2 border border-borderColor flex justify-between items-center text-sm">
-              <div>
-                <p className="text-textPrimary font-semibold">
-                  {account.customer_name}
-                </p>
-                <p className="text-textMuted text-xs">
-                  {account.customer_phone} · Balance{" "}
-                  {formatKes(account.current_balance)} / Limit{" "}
-                  {formatKes(account.credit_limit)}
-                </p>
-              </div>
-              <button
-                onClick={() =>
-                  setExpandedId(expandedId === account.id ? null : account.id)
-                }
-                className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
-                {expandedId === account.id ? "Close" : "Manage"}
-              </button>
-            </div>
-            {expandedId === account.id && (
-              <AccountDetail
-                account={account}
-                onUpdated={load}
-                onClose={() => setExpandedId(null)}
-                businessConfig={businessConfig}
-              />
-            )}
+      <section className="mt-6">
+        <div className="rounded-2xl overflow-hidden border border-borderColor">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface1 text-textSecondary">
+                <tr>
+                  <th className="p-3 text-left font-semibold">Customer</th>
+                  <th className="p-3 text-left font-semibold">Phone</th>
+                  <th className="p-3 text-right font-semibold">Balance</th>
+                  <th className="p-3 text-right font-semibold">Limit</th>
+                  <th className="p-3 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-center text-textMuted text-sm">
+                      No corporate accounts registered yet.
+                    </td>
+                  </tr>
+                ) : (
+                  accounts.map((account) => (
+                    <Fragment key={account.id}>
+                      <tr className="border-t border-borderColor text-textPrimary">
+                        <td className="p-3 font-semibold">{account.customer_name}</td>
+                        <td className="p-3 text-textSecondary">{account.customer_phone}</td>
+                        <td className="p-3 text-right">{formatKes(account.current_balance)}</td>
+                        <td className="p-3 text-right">{formatKes(account.credit_limit)}</td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() =>
+                              setExpandedId(expandedId === account.id ? null : account.id)
+                            }
+                            className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                            {expandedId === account.id ? "Close" : "Manage"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedId === account.id && (
+                        <tr className="border-t border-borderColor">
+                          <td colSpan={5} className="p-3 bg-surface1">
+                            <AccountDetail
+                              account={account}
+                              onUpdated={load}
+                              onClose={() => setExpandedId(null)}
+                              businessConfig={businessConfig}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        ))}
+        </div>
       </section>
     </main>
   );

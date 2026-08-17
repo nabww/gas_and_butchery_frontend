@@ -158,6 +158,10 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
     staff.role === 'admin' || (staff.role === 'supervisor' && staff.canSwitchLocation);
   const { theme, toggleTheme } = useTheme();
   const { locations, activeLocationId, setActiveLocationId } = useActiveLocation();
+  // Inactive shops shouldn't be selectable to browse/sell as -- if the
+  // currently active one just got deactivated, it still shows as the
+  // current selection until the admin explicitly switches away from it.
+  const switchableLocations = locations.filter((loc) => loc.is_active);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleNav = (path) => {
@@ -194,9 +198,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           />
         ))}
 
-        {showLocationSwitcher && locations.length > 0 && (
+        {showLocationSwitcher && switchableLocations.length > 0 && (
           <LocationSwitcher
-            locations={locations}
+            locations={switchableLocations}
             activeLocationId={activeLocationId}
             onChange={setActiveLocationId}
           />
@@ -287,10 +291,10 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             ))}
           </div>
 
-          {showLocationSwitcher && locations.length > 0 && (
+          {showLocationSwitcher && switchableLocations.length > 0 && (
             <div className="pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
               <LocationSwitcher
-                locations={locations}
+                locations={switchableLocations}
                 activeLocationId={activeLocationId}
                 onChange={(id) => {
                   setMobileOpen(false);

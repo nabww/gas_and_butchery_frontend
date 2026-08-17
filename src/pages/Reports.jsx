@@ -80,7 +80,7 @@ export default function Reports() {
     const load = async () => {
       try {
         if (activeTab === "promotions") {
-          const data = await getPromoPayouts(true);
+          const data = await getPromoPayouts(true, activeLocationId);
           if (!cancelled) setPayouts(data);
         } else if (activeTab === "corporate") {
           const data = await listCorporateAccounts();
@@ -161,6 +161,7 @@ export default function Reports() {
   const renderPromotions = () => {
     const rows = filteredPayouts.map((p) => ({
       date: new Date(p.created_at).toLocaleString("en-KE"),
+      location: p.location_name || "—",
       customer: p.customer_name || p.customer_phone || "—",
       type: p.type,
       detail:
@@ -203,6 +204,7 @@ export default function Reports() {
         <DataTable
           columns={[
             { key: "date", label: "Date" },
+            { key: "location", label: "Branch" },
             { key: "customer", label: "Customer" },
             { key: "type", label: "Type" },
             { key: "detail", label: "Detail" },
@@ -411,7 +413,11 @@ export default function Reports() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatBox label="Transactions" value={summary.totalSales} />
             <StatBox label="Revenue" value={`KES ${Number(summary.totalRevenue || 0).toFixed(2)}`} />
-            <StatBox label="Discounts" value={`KES ${Number(summary.totalDiscount || 0).toFixed(2)}`} />
+            <StatBox
+              label="Discounts"
+              value={`KES ${Number(summary.totalDiscount || 0).toFixed(2)}`}
+              sub="Manual discounts + loyalty points redeemed"
+            />
             <StatBox label="Methods" value={Object.keys(summary.byMethod || {}).length} />
           </div>
         )}
