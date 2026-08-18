@@ -30,18 +30,32 @@ function BusinessConfigSection({ message, setMessage }) {
     business_tagline: "",
     business_logo_url: "",
   });
+  const [savedConfig, setSavedConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     getBusinessConfig()
-      .then(setConfig)
+      .then((loaded) => {
+        setConfig(loaded);
+        setSavedConfig(loaded);
+      })
       .catch((err) => setMessage(err.message || "Failed to load business config."))
       .finally(() => setLoading(false));
   }, [setMessage]);
 
-  const save = async () => {
+  const isDirty =
+    !!savedConfig &&
+    (config.business_name !== savedConfig.business_name ||
+      config.business_tagline !== savedConfig.business_tagline ||
+      config.business_logo_url !== savedConfig.business_logo_url);
+
+  // Autosaves on blur, same pattern as the Loyalty tab -- low-risk fields
+  // (display text/a URL), so there's no real downside to saving as soon
+  // as someone finishes editing a field instead of requiring a click.
+  const saveIfChanged = async () => {
+    if (!isDirty || saving) return;
     setSaving(true);
     setMessage("");
     try {
@@ -51,6 +65,7 @@ function BusinessConfigSection({ message, setMessage }) {
         business_logo_url: config.business_logo_url,
       });
       setConfig(updated);
+      setSavedConfig(updated);
       setMessage("Business settings saved.");
     } catch (err) {
       setMessage(err.message || "Failed to save business settings.");
@@ -59,13 +74,26 @@ function BusinessConfigSection({ message, setMessage }) {
     }
   };
 
+  const handleFieldKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.target.blur();
+      saveIfChanged();
+    }
+  };
+
   const handleLogoUpload = async (file) => {
     if (!file) return;
     setUploading(true);
     setMessage("");
     try {
+      // Uploading saves the logo server-side immediately (unlike name/
+      // tagline, which wait for the Save button) -- keep savedConfig in
+      // sync so the button doesn't appear for a change that's already
+      // persisted.
       const updated = await uploadBusinessLogo(file);
       setConfig(updated);
+      setSavedConfig(updated);
       setMessage("Logo uploaded.");
     } catch (err) {
       setMessage(err.message || "Failed to upload logo.");
@@ -82,12 +110,7 @@ function BusinessConfigSection({ message, setMessage }) {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!saving) save();
-      }}
-      className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
+    <div className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
       <div>
         <label htmlFor="business-name" className="text-textPrimary font-semibold text-sm">
           Business name
@@ -97,6 +120,9 @@ function BusinessConfigSection({ message, setMessage }) {
           className={input}
           value={config.business_name}
           onChange={(e) => setConfig({ ...config, business_name: e.target.value })}
+          onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
+          disabled={saving}
           placeholder="e.g. TeziPOS"
         />
       </div>
@@ -112,6 +138,9 @@ function BusinessConfigSection({ message, setMessage }) {
           onChange={(e) =>
             setConfig({ ...config, business_tagline: e.target.value })
           }
+          onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
+          disabled={saving}
           placeholder="e.g. Butchery & Gas"
         />
       </div>
@@ -120,53 +149,48 @@ function BusinessConfigSection({ message, setMessage }) {
         <label className="text-textPrimary font-semibold text-sm">
           Logo
         </label>
-        {config.business_logo_url && (
-          <div className="mt-2 flex items-center gap-3">
-            <img
-              src={config.business_logo_url}
-              alt="Logo preview"
-              className="h-12 w-12 rounded-lg border border-borderColor bg-surface1 object-contain"
-            />
-            <p className="text-textSecondary text-xs truncate max-w-xs">
-              {config.business_logo_url}
-            </p>
+        <div className="mt-2 flex items-center gap-3">
+          <div className="h-12 w-12 flex-shrink-0 rounded-lg border border-borderColor bg-surface1 flex items-center justify-center overflow-hidden">
+            {config.business_logo_url ? (
+              <img
+                src={config.business_logo_url}
+                alt="Logo preview"
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <span className="text-textMuted text-xs">None</span>
+            )}
           </div>
-        )}
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml,image/webp"
-          onChange={(e) => handleLogoUpload(e.target.files?.[0])}
-          disabled={uploading}
-          className="mt-2 block w-full text-sm text-textSecondary
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-lg file:border-0
-            file:text-sm file:font-semibold
-            file:bg-primary file:text-onPrimary
-            hover:file:bg-primary/90
-            disabled:opacity-50"
-        />
-        <p className="text-textMuted text-sm mt-2">
-          Upload a PNG, JPG, GIF, SVG, or WebP image (max 2 MB). Or paste a URL below.
+          <label
+            className={`px-3 py-2 rounded-lg border border-borderColor bg-surface1 text-textPrimary text-sm font-medium cursor-pointer hover:bg-surface3 transition-colors ${
+              uploading ? "opacity-50 pointer-events-none" : ""
+            }`}>
+            {uploading ? "Uploading…" : "Choose file"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml,image/webp"
+              onChange={(e) => handleLogoUpload(e.target.files?.[0])}
+              disabled={uploading}
+              className="hidden"
+            />
+          </label>
+        </div>
+        <p className="text-textMuted text-xs mt-2">
+          PNG, JPG, GIF, SVG, or WebP, max 2 MB — or paste an image URL below.
         </p>
         <input
-          className={`${input} mt-2`}
+          className={input}
           value={config.business_logo_url}
           onChange={(e) =>
             setConfig({ ...config, business_logo_url: e.target.value })
           }
+          onBlur={saveIfChanged}
+          onKeyDown={handleFieldKeyDown}
+          disabled={saving}
           placeholder="https://... or /uploads/logos/logo.png"
         />
       </div>
-
-      <div className="border-t border-borderColor pt-5 flex justify-end">
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
-          {saving ? "Saving..." : "Save business settings"}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }
 
@@ -368,18 +392,21 @@ function LoyaltySettingsSection({ message, setMessage }) {
   );
 }
 
+const SMS_FORM_DEFAULTS = {
+  provider: "console",
+  sender_id: "",
+  api_key: "",
+  client_id: "",
+  is_active: false,
+  send_receipt_sms: false,
+  send_promo_win_sms: false,
+  send_stock_alert_sms: false,
+};
+
 function SmsSettingsSection({ setMessage }) {
   const [config, setConfig] = useState(null);
-  const [form, setForm] = useState({
-    provider: "console",
-    sender_id: "",
-    api_key: "",
-    client_id: "",
-    is_active: false,
-    send_receipt_sms: false,
-    send_promo_win_sms: false,
-    send_stock_alert_sms: false,
-  });
+  const [form, setForm] = useState(SMS_FORM_DEFAULTS);
+  const [savedForm, setSavedForm] = useState(SMS_FORM_DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -388,7 +415,7 @@ function SmsSettingsSection({ setMessage }) {
     getSmsConfig()
       .then((cfg) => {
         setConfig(cfg);
-        setForm({
+        const loaded = {
           provider: cfg.provider || "console",
           sender_id: cfg.sender_id || "",
           api_key: "",
@@ -397,13 +424,28 @@ function SmsSettingsSection({ setMessage }) {
           send_receipt_sms: !!cfg.send_receipt_sms,
           send_promo_win_sms: !!cfg.send_promo_win_sms,
           send_stock_alert_sms: !!cfg.send_stock_alert_sms,
-        });
+        };
+        setForm(loaded);
+        setSavedForm(loaded);
       })
       .catch((err) => setMessage(err.message || "Failed to load SMS config."))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // api_key/client_id are never populated from the server (masked secrets
+  // -- see load() above), so any non-blank value there is itself a change,
+  // not something to diff against a stored value.
+  const isDirty =
+    form.provider !== savedForm.provider ||
+    form.sender_id !== savedForm.sender_id ||
+    form.api_key !== "" ||
+    form.client_id !== "" ||
+    form.is_active !== savedForm.is_active ||
+    form.send_receipt_sms !== savedForm.send_receipt_sms ||
+    form.send_promo_win_sms !== savedForm.send_promo_win_sms ||
+    form.send_stock_alert_sms !== savedForm.send_stock_alert_sms;
 
   const save = async (e) => {
     e.preventDefault();
@@ -412,7 +454,18 @@ function SmsSettingsSection({ setMessage }) {
     try {
       const updated = await saveSmsConfig(form);
       setConfig(updated);
-      setForm((f) => ({ ...f, api_key: "", client_id: "" }));
+      const saved = {
+        provider: updated.provider || "console",
+        sender_id: updated.sender_id || "",
+        api_key: "",
+        client_id: "",
+        is_active: !!updated.is_active,
+        send_receipt_sms: !!updated.send_receipt_sms,
+        send_promo_win_sms: !!updated.send_promo_win_sms,
+        send_stock_alert_sms: !!updated.send_stock_alert_sms,
+      };
+      setForm(saved);
+      setSavedForm(saved);
       setMessage("SMS settings saved.");
     } catch (err) {
       setMessage(err.message || "Failed to save SMS settings.");
@@ -429,7 +482,12 @@ function SmsSettingsSection({ setMessage }) {
   }
 
   return (
-    <section className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!saving && isDirty) save(e);
+      }}
+      className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
       <div>
         <p className="text-textPrimary font-semibold text-sm">Bulk SMS (Onfon Media)</p>
         <p className="text-textMuted text-xs mt-1">
@@ -554,15 +612,17 @@ function SmsSettingsSection({ setMessage }) {
         </label>
       </div>
 
-      <div className="pt-2">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
-          {saving ? "Saving…" : "Save SMS settings"}
-        </button>
-      </div>
-    </section>
+      {isDirty && (
+        <div className="border-t border-borderColor pt-5 flex justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+            {saving ? "Saving…" : "Save SMS settings"}
+          </button>
+        </div>
+      )}
+    </form>
   );
 }
 

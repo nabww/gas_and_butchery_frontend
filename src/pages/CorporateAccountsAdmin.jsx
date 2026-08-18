@@ -836,6 +836,7 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
   });
   const [message, setMessage] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
+  const [showInvoices, setShowInvoices] = useState(false);
   const mpesaPollRef = useRef(null);
 
   const messageTone = (() => {
@@ -902,6 +903,9 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
       .then(setProducts)
       .catch(() => setProducts([]));
   }, [account.id]);
+
+  const isCreditLimitDirty =
+    String(creditLimit) !== String(account.credit_limit);
 
   const saveCreditLimit = async () => {
     setSavingLimit(true);
@@ -1345,21 +1349,27 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
             {formatKes(availableCredit)}
           </p>
         </div>
-        <div className="flex gap-2">
-          <input
-            className={input}
-            type="number"
-            min="0"
-            step="0.01"
-            value={creditLimit}
-            onChange={(e) => setCreditLimit(e.target.value)}
-          />
-          <button
-            onClick={saveCreditLimit}
-            disabled={savingLimit}
-            className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold disabled:opacity-50 shrink-0">
-            Save limit
-          </button>
+        <div>
+          <p className="text-textMuted text-xs mb-1">Credit limit</p>
+          <div className="flex gap-2">
+            <input
+              className={input}
+              type="number"
+              min="0"
+              step="0.01"
+              value={creditLimit}
+              onChange={(e) => setCreditLimit(e.target.value)}
+              disabled={savingLimit}
+            />
+            {isCreditLimitDirty && (
+              <button
+                onClick={saveCreditLimit}
+                disabled={savingLimit}
+                className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold disabled:opacity-50 shrink-0">
+                {savingLimit ? "Saving…" : "Save"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1439,6 +1449,17 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
             Generate consolidated statement up to date
           </button>
         </div>
+        <span
+          onClick={() => setShowInvoices((v) => !v)}
+          className="text-primary text-sm underline cursor-pointer hover:text-primary-dark inline-block mb-2"
+          tabIndex={0}
+          role="button"
+          onKeyDown={(e) => e.key === "Enter" && setShowInvoices((v) => !v)}
+        >
+          {showInvoices ? "Hide invoices" : "View invoices"}
+        </span>
+        {showInvoices && (
+        <>
         <p className="text-textMuted text-xs mb-2">
           Per-transaction invoices are generated from the sale/receipt itself
           once a sale is charged to this account.
@@ -1536,6 +1557,8 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
             </table>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
