@@ -4,28 +4,43 @@ import {
   resetCurrentSale,
   getPendingSaleSnapshot,
 } from "../lib/db/syncQueue";
-import { getStoredStaff } from "../lib/api";
+import { getStoredStaff, checkBackendReachable } from "../lib/api";
 import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
-import {
-  isOfflineSalesEnabled,
-  setOfflineSalesEnabled,
-} from "../lib/settings";
+import { setOfflineSalesEnabled } from "../lib/settings";
 import ProductCatalog from "../components/ProductCatalog";
+import CategoryPills from "../components/CategoryPills";
 import Cart from "../components/Cart";
 import CustomerSelector from "../components/CustomerSelector";
 import Payment from "../components/Payment";
 import "../styles/till.css";
+import { CTabs, CTabList, CTab } from "@coreui/react";
+import "@coreui/coreui/dist/css/coreui.min.css";
 
-function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+function useBackendOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(true);
   useEffect(() => {
-    const handler = () => setIsOnline(navigator.onLine);
-    window.addEventListener("online", handler);
-    window.addEventListener("offline", handler);
+    let cancelled = false;
+    let polling = false;
+    const runCheck = async () => {
+      if (polling) return;
+      polling = true;
+      const ok = await checkBackendReachable();
+      if (!cancelled) {
+        setIsOnline(ok);
+      }
+      polling = false;
+    };
+    runCheck();
+    const id = setInterval(runCheck, 5000);
+    const onNetChange = () => runCheck();
+    window.addEventListener("online", onNetChange);
+    window.addEventListener("offline", onNetChange);
     return () => {
-      window.removeEventListener("online", handler);
-      window.removeEventListener("offline", handler);
+      cancelled = true;
+      clearInterval(id);
+      window.removeEventListener("online", onNetChange);
+      window.removeEventListener("offline", onNetChange);
     };
   }, []);
   return isOnline;
@@ -34,7 +49,18 @@ function useOnlineStatus() {
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
 
 export default function Till({ staff, onNavigate }) {
-  const isOnline = useOnlineStatus();
+  const isOnline = useBackendOnlineStatus();
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const prevOnlineRef = useRef(true);
+
+  useEffect(() => {
+    if (prevOnlineRef.current && !isOnline) {
+      setOfflineSalesEnabled(true);
+      setShowOfflineModal(true);
+    }
+    prevOnlineRef.current = isOnline;
+  }, [isOnline]);
+
   const { activeLocationId, locations } = useActiveLocation();
   // A supervisor/admin who has switched shops via the nav sees that shop's
   // catalog and stock here too — useful for admins checking stock or
@@ -93,10 +119,13 @@ export default function Till({ staff, onNavigate }) {
   const [error, setError] = useState("");
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [pendingConsentCustomer, setPendingConsentCustomer] = useState(null);
-  const [offlineSalesEnabled, setOfflineSalesEnabledState] = useState(
-    isOfflineSalesEnabled,
-  );
   const isInitializing = useRef(false);
+  // On narrow screens the catalog and cart can't both fit on screen at
+  // once without squashing the cart into an unusable sliver -- show one
+  // full-height pane at a time instead (desktop/tablet still shows both
+  // side by side; see till.css). Both panes stay mounted so switching
+  // tabs never resets scroll position or in-progress input.
+  const [mobileTab, setMobileTab] = useState("catalog");
   const {
     saleId,
     setSaleId,
@@ -165,13 +194,8 @@ export default function Till({ staff, onNavigate }) {
       setError(err.message);
     }
     resetCart();
+    setMobileTab("catalog");
     await initializeNewSale();
-  };
-
-  const handleToggleOfflineSales = () => {
-    const next = !offlineSalesEnabled;
-    setOfflineSalesEnabledState(next);
-    setOfflineSalesEnabled(next);
   };
 
   const handleRegisterPendingCustomer = () => {
@@ -185,28 +209,47 @@ export default function Till({ staff, onNavigate }) {
     <div className="till-container">
       <div className="till-header">
         <h1>Sales Till</h1>
-        <div className="flex items-center gap-4 text-textSecondary text-sm">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={offlineSalesEnabled}
-              onChange={handleToggleOfflineSales}
-              className="w-4 h-4 accent-primary"
+        {allowedBusinesses.length > 1 && (
+          <div className="till-header-pills">
+            <CategoryPills
+              categories={allowedBusinesses}
+              active={businessType}
+              onSelect={setBusinessType}
+              labels={businessLabels}
             />
-            <span className="hidden sm:inline">Offline sales</span>
-          </label>
-          <span className="hidden sm:inline">TeziPOS</span>
+          </div>
+        )}
+        <div className="flex items-center gap-4 text-textSecondary text-sm">
           <span
-            className={`w-2 h-2 rounded-full ${isOnline ? "bg-success" : "bg-warning"}`}
+            className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-success" : "bg-warning"}`}
             aria-label={isOnline ? "System online" : "Working offline"}
             title={isOnline ? "System online" : "Working offline"}></span>
         </div>
       </div>
 
+      {showOfflineModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-surface2 p-6 rounded-2xl border border-borderColor max-w-sm w-full text-center m-4">
+            <h2 className="text-lg font-bold text-textPrimary">Working offline</h2>
+            <p className="text-sm text-textSecondary mt-2">
+              The connection to the server was lost. You can keep making sales — they will
+              sync automatically once the connection is restored.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowOfflineModal(false)}
+              className="mt-4 px-4 py-2 rounded-lg bg-primary text-onPrimary font-semibold text-sm">
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       {isSellingElsewhere && (
         <div className="selling-elsewhere-banner">
-          ⚠ Selling as {sellingLocationName || `location ${saleLocationOverride}`} — your
-          home branch is {homeLocationName || "different"}. Sales made now will be booked
+          ⚠ Selling as {sellingLocationName || `location ${saleLocationOverride}`}. Sales made now will be booked
           to that branch, not yours.
         </div>
       )}
@@ -224,48 +267,64 @@ export default function Till({ staff, onNavigate }) {
       {loading && <div className="loading">Initializing sale...</div>}
 
       {!loading && allowedBusinesses.length > 0 && (
-        <div className="till-content">
-          {/* Left pane: Product catalog */}
-          <div className="left-pane">
-            <ProductCatalog
-              businessType={businessType}
-              allowedBusinesses={allowedBusinesses}
-              onSelectBusiness={setBusinessType}
-              staffRole={staff?.role}
-              refreshSignal={catalogRefreshKey}
-              locationId={catalogLocationId}
-              businessLabels={businessLabels}
-            />
-          </div>
+        <>
+          {/* Mobile-only tab switcher -- hidden on tablet/desktop, where
+              both panes already show side by side (see till.css). */}
+          <CTabs
+            activeItemKey={mobileTab}
+            onChange={setMobileTab}
+            className="till-mobile-tabs catalog-stock-tabs">
+            <CTabList variant="tabs">
+              <CTab itemKey="catalog">Catalog</CTab>
+              <CTab itemKey="cart">Cart{items.length > 0 ? ` (${items.length})` : ""}</CTab>
+            </CTabList>
+          </CTabs>
 
-          {/* Right pane: Cart, customer, payment */}
-          <div className="right-pane">
-            <div className="right-section customer-section">
-              <CustomerSelector />
+          <div className={`till-content mobile-view-${mobileTab}`}>
+            {/* Left pane: Product catalog */}
+            <div className="left-pane">
+              <ProductCatalog
+                businessType={businessType}
+                allowedBusinesses={allowedBusinesses}
+                onSelectBusiness={setBusinessType}
+                staffRole={staff?.role}
+                refreshSignal={catalogRefreshKey}
+                locationId={catalogLocationId}
+                businessLabels={businessLabels}
+                hideCategoryPills
+              />
             </div>
 
-            <div className="right-section cart-section">
-              <Cart canRedeemPoints={staff?.canRedeemPoints} />
+            {/* Right pane: Cart, customer, payment */}
+            <div className="right-pane">
+              <div className="right-section customer-section">
+                <CustomerSelector />
+              </div>
+
+              <div className="right-section cart-section">
+                <Cart canRedeemPoints={staff?.canRedeemPoints} />
+              </div>
+
+              {items.length > 0 && (
+                <>
+                  <div className="right-section checkout-section">
+                    <Payment
+                      isOnline={isOnline}
+                      onSaleCompleted={() => setCatalogRefreshKey((k) => k + 1)}
+                      onNewMpesaCustomer={setPendingConsentCustomer}
+                    />
+                  </div>
+
+                  <div className="till-actions">
+                    <button onClick={handleStartNewSale} className="btn-new-sale">
+                      New Sale
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-
-            {items.length > 0 && (
-              <>
-                <div className="right-section checkout-section">
-                  <Payment
-                    onSaleCompleted={() => setCatalogRefreshKey((k) => k + 1)}
-                    onNewMpesaCustomer={setPendingConsentCustomer}
-                  />
-                </div>
-
-                <div className="till-actions">
-                  <button onClick={handleStartNewSale} className="btn-new-sale">
-                    New Sale
-                  </button>
-                </div>
-              </>
-            )}
           </div>
-        </div>
+        </>
       )}
 
       {pendingConsentCustomer && (

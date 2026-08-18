@@ -6,9 +6,17 @@ import {
   updateStaff,
   deactivateStaff,
 } from "../lib/api";
+import { MODULE_CATALOG, ROLE_DEFAULT_MODULES } from "../lib/modules";
 
 const roleOptions = ["cashier", "supervisor", "admin"];
 const businessOptions = ["butchery", "gas"];
+
+// Modules a given role never needs listed as "extra" grants, since
+// they're already included by default -- see lib/modules.js.
+function extraGrantableModules(role) {
+  const defaults = ROLE_DEFAULT_MODULES[role] || [];
+  return MODULE_CATALOG.filter((module) => !defaults.includes(module.key));
+}
 
 const inputClass =
   "w-full rounded-lg bg-surface1 border border-borderColor px-3 py-2 text-textPrimary text-sm";
@@ -37,6 +45,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
     role: "cashier",
     location_id: assignableLocations[0]?.id || "",
     business_access: ["butchery"],
+    module_access: [],
     pin: "",
     can_redeem_points: false,
     can_switch_location: false,
@@ -51,6 +60,9 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   );
   const [businessAccess, setBusinessAccess] = useState(
     defaults.business_access || ["butchery"],
+  );
+  const [moduleAccess, setModuleAccess] = useState(
+    defaults.module_access || [],
   );
   const [pin, setPin] = useState(defaults.pin || "");
   const [canRedeemPoints, setCanRedeemPoints] = useState(
@@ -77,6 +89,16 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
     );
   };
 
+  const toggleModule = (key) => {
+    setModuleAccess((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key],
+    );
+  };
+
+  const grantableModules = extraGrantableModules(role);
+
   const submit = async () => {
     if (!name.trim()) {
       setError("Name is required");
@@ -101,6 +123,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
         role,
         location_id: locationId ? Number(locationId) : null,
         business_access: businessAccess,
+        module_access: moduleAccess,
         can_redeem_points: canRedeemPoints,
         can_switch_location: canSwitchLocation,
         is_active: isActive,
@@ -249,6 +272,36 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <p className="text-textMuted text-xs mb-2">
+          Extra module access
+          <span className="ml-1 text-textMuted/70">
+            (beyond what the {role} role already gets by default)
+          </span>
+        </p>
+        {grantableModules.length === 0 ? (
+          <p className="text-textMuted text-xs">
+            The {role} role already has every module -- nothing extra to grant.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {grantableModules.map((module) => (
+              <button
+                key={module.key}
+                type="button"
+                onClick={() => toggleModule(module.key)}
+                className={`px-3 py-2 rounded-lg border text-xs font-semibold ${
+                  moduleAccess.includes(module.key)
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-borderColor bg-surface1 text-textSecondary"
+                }`}>
+                {module.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && <p className="text-danger text-xs font-semibold">{error}</p>}
@@ -426,6 +479,7 @@ export default function StaffAdmin({ staffRole }) {
                     <th className="p-3 text-left font-semibold">Phone</th>
                     <th className="p-3 text-left font-semibold">Location</th>
                     <th className="p-3 text-left font-semibold">Business access</th>
+                    <th className="p-3 text-left font-semibold">Extra modules</th>
                     <th className="p-3 text-left font-semibold">Status</th>
                     <th className="p-3 text-right font-semibold">Actions</th>
                   </tr>
@@ -433,7 +487,7 @@ export default function StaffAdmin({ staffRole }) {
                 <tbody>
                   {filteredStaff.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-4 text-center text-textMuted text-xs">
+                      <td colSpan={8} className="p-4 text-center text-textMuted text-xs">
                         No staff match the current filters.
                       </td>
                     </tr>
@@ -460,6 +514,26 @@ export default function StaffAdmin({ staffRole }) {
                                   {access}
                                 </span>
                               ))}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1.5">
+                              {extraGrantableModules(member.role)
+                                .filter((module) =>
+                                  (member.module_access || []).includes(module.key),
+                                )
+                                .map((module) => (
+                                  <span
+                                    key={module.key}
+                                    className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wide">
+                                    {module.label}
+                                  </span>
+                                ))}
+                              {extraGrantableModules(member.role).filter((module) =>
+                                (member.module_access || []).includes(module.key),
+                              ).length === 0 && (
+                                <span className="text-textMuted text-[10px]">Role default only</span>
+                              )}
                             </div>
                           </td>
                           <td className="p-3">
@@ -497,7 +571,7 @@ export default function StaffAdmin({ staffRole }) {
                         </tr>
                         {expandedId === member.id && (
                           <tr className="border-t border-borderColor">
-                            <td colSpan={7} className="p-3 bg-surface1">
+                            <td colSpan={8} className="p-3 bg-surface1">
                               <StaffForm
                                 locations={locations}
                                 editing={editing}

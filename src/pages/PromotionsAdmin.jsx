@@ -206,7 +206,7 @@ export default function PromotionsAdmin() {
         configured average.
       </p>
       {message && (
-        <p className="mt-4 p-3 rounded-xl bg-success/10 text-success text-sm">
+        <p className="mt-4 p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-sm">
           {message}
         </p>
       )}
@@ -219,111 +219,107 @@ export default function PromotionsAdmin() {
         </button>
       )}
       {showForm && !editing && renderForm()}
-      <section className="mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-textPrimary">Promotion rules</h2>
-          <div className="flex gap-1 rounded-lg bg-surface1 border border-borderColor p-1">
-            {["active", "inactive", "all"].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setStatusFilter(f)}
-                className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${
-                  statusFilter === f
-                    ? "bg-primary text-onPrimary"
-                    : "text-textSecondary hover:text-textPrimary"
-                }`}>
-                {f}
-              </button>
-            ))}
+      {rules.length > 0 && (
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-textPrimary">Promotion rules</h2>
+            <div className="flex gap-1 rounded-lg bg-surface1 border border-borderColor p-1">
+              {["active", "inactive", "all"].map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${
+                    statusFilter === f
+                      ? "bg-primary text-onPrimary"
+                      : "text-textSecondary hover:text-textPrimary"
+                  }`}>
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="rounded-2xl overflow-hidden border border-borderColor">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface1 text-textSecondary">
-                <tr>
-                  <th className="p-3 text-left font-semibold">Type</th>
-                  <th className="p-3 text-left font-semibold">Trigger</th>
-                  <th className="p-3 text-left font-semibold">Status</th>
-                  <th className="p-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRules.length === 0 ? (
+          <div className="rounded-2xl overflow-hidden border border-borderColor">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface1 text-textSecondary">
                   <tr>
-                    <td colSpan={4} className="p-4 text-center text-textMuted text-sm">
-                      No {statusFilter !== "all" ? statusFilter : ""} rules.
-                    </td>
+                    <th className="p-3 text-left font-semibold">Type</th>
+                    <th className="p-3 text-left font-semibold">Trigger</th>
+                    <th className="p-3 text-left font-semibold">Status</th>
+                    <th className="p-3 text-right font-semibold">Actions</th>
                   </tr>
-                ) : (
-                  visibleRules.map((rule) => (
-                    <Fragment key={rule.id}>
-                      <tr className="border-t border-borderColor text-textPrimary">
-                        <td className="p-3 capitalize">{rule.type}</td>
-                        <td className="p-3">
-                          {rule.trigger_type === "nth_sale"
-                            ? `about every ${rule.trigger_value} customer sales (±${rule.milestone_variance})`
-                            : `${Number(rule.trigger_value) * 100}% per sale`}
-                        </td>
-                        <td className="p-3">
-                          {rule.active ? (
-                            <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-semibold">
-                              Active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-textMuted/20 text-textMuted text-xs font-semibold">
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-right">
-                          <button
-                            className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary"
-                            onClick={() => (editing === rule.id ? cancelForm() : edit(rule))}>
-                            {editing === rule.id ? "Close" : "Edit"}
-                          </button>
-                        </td>
-                      </tr>
-                      {editing === rule.id && (
-                        <tr className="border-t border-borderColor">
-                          <td colSpan={4} className="p-3 bg-surface1">
-                            {renderForm()}
+                </thead>
+                <tbody>
+                  {visibleRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-4 text-center text-textMuted text-sm">
+                        No {statusFilter !== "all" ? statusFilter : ""} rules.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleRules.map((rule) => (
+                      <Fragment key={rule.id}>
+                        <tr className="border-t border-borderColor text-textPrimary">
+                          <td className="p-3 capitalize">{rule.type}</td>
+                          <td className="p-3">
+                            {rule.trigger_type === "nth_sale"
+                              ? `about every ${rule.trigger_value} customer sales (±${rule.milestone_variance})`
+                              : `${Number(rule.trigger_value) * 100}% per sale`}
+                          </td>
+                          <td className="p-3">
+                            {rule.active ? (
+                              <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-semibold">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-textMuted/20 text-textMuted text-xs font-semibold">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary"
+                              onClick={() => (editing === rule.id ? cancelForm() : edit(rule))}>
+                              {editing === rule.id ? "Close" : "Edit"}
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </Fragment>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        {editing === rule.id && (
+                          <tr className="border-t border-borderColor">
+                            <td colSpan={4} className="p-3 bg-surface1">
+                              {renderForm()}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
-      <section className="mt-8">
-        <h2 className="text-lg font-bold text-textPrimary mb-3">
-          Pending cashback payouts
-        </h2>
-        <div className="rounded-2xl overflow-hidden border border-borderColor">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface1 text-textSecondary">
-                <tr>
-                  <th className="p-3 text-left font-semibold">Customer</th>
-                  <th className="p-3 text-left font-semibold">Branch</th>
-                  <th className="p-3 text-right font-semibold">Amount</th>
-                  <th className="p-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payouts.filter((p) => p.type === "cashback").length === 0 ? (
+        </section>
+      )}
+      {payouts.filter((p) => p.type === "cashback").length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-lg font-bold text-textPrimary mb-3">
+            Pending cashback payouts
+          </h2>
+          <div className="rounded-2xl overflow-hidden border border-borderColor">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface1 text-textSecondary">
                   <tr>
-                    <td colSpan={4} className="p-4 text-center text-textMuted text-sm">
-                      No pending cashback payouts.
-                    </td>
+                    <th className="p-3 text-left font-semibold">Customer</th>
+                    <th className="p-3 text-left font-semibold">Branch</th>
+                    <th className="p-3 text-right font-semibold">Amount</th>
+                    <th className="p-3 text-right font-semibold">Actions</th>
                   </tr>
-                ) : (
-                  payouts
+                </thead>
+                <tbody>
+                  {payouts
                     .filter((p) => p.type === "cashback")
                     .map((p) => (
                       <tr key={p.id} className="border-t border-borderColor text-textPrimary">
@@ -339,13 +335,13 @@ export default function PromotionsAdmin() {
                           </button>
                         </td>
                       </tr>
-                    ))
-                )}
-              </tbody>
-            </table>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <PayoutActionModal
         payout={selectedPayout}

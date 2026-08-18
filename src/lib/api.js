@@ -88,7 +88,7 @@ export async function apiFetch(path, options = {}) {
       },
     });
   } catch (networkErr) {
-    throw new Error("Server unreachable — working offline");
+    throw new Error("This feature isn't available while offline.");
   }
 
   if (res.status === 401) {
@@ -104,9 +104,7 @@ export async function apiFetch(path, options = {}) {
       // the request never reached the backend (e.g. dev proxy error page
       // when the server is down/unreachable) — treat this as an offline
       // condition rather than surfacing a raw status code.
-      throw new Error(
-        "This feature needs an internet connection to the server. Please check your connection and try again.",
-      );
+      throw new Error("This feature isn't available while offline.");
     }
     throw new Error("Unexpected response from server. Is the backend running?");
   }
@@ -119,6 +117,24 @@ export async function apiFetch(path, options = {}) {
     throw err;
   }
   return data;
+}
+
+const PING_TIMEOUT_MS = 3000;
+
+export async function checkBackendReachable() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/config`, {
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ========== SALES API ==========
@@ -321,6 +337,20 @@ export async function saveLocationMpesaConfig(locationId, payload) {
 export async function resetLocationMpesaConfig(locationId) {
   return apiFetch(`/staff/locations/${locationId}/mpesa-config`, {
     method: "DELETE",
+  });
+}
+
+// ========== BULK SMS (ONFON) CONFIG ==========
+// Business-wide, not per-location -- see build plan Section 8.
+
+export async function getSmsConfig() {
+  return apiFetch("/notifications/sms-config");
+}
+
+export async function saveSmsConfig(payload) {
+  return apiFetch("/notifications/sms-config", {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }
 

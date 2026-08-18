@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTheme } from '../lib/useTheme';
 import { useActiveLocation } from '../contexts/LocationContext';
+import { MODULE_CATALOG, effectiveModules } from '../lib/modules';
+import { getBusinessConfig } from '../lib/api';
 
 function HamburgerIcon({ open }) {
   return (
@@ -11,30 +13,6 @@ function HamburgerIcon({ open }) {
     </svg>
   );
 }
-
-// Nav items per role, per build plan Section 5b. The nav only renders
-// what a person can access -- no greyed-out items cluttering a screen
-// built for speed.
-const NAV_BY_ROLE = {
-  cashier: [{ label: 'Till', path: '/till' }],
-  supervisor: [
-    { label: 'Till', path: '/till' },
-    { label: 'Overrides', path: '/overrides' },
-    { label: 'Catalog', path: '/catalog' },
-  ],
-  admin: [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Till', path: '/till' },
-    { label: 'Reports', path: '/reports' },
-    { label: 'Customers', path: '/customers' },
-    { label: 'Staff', path: '/staff' },
-    { label: 'Catalog', path: '/catalog' },
-    { label: 'Rewards', path: '/rewards' },
-    { label: 'Promos', path: '/promotions' },
-    { label: 'Corporate', path: '/corporate' },
-    { label: 'Settings', path: '/settings' },
-  ],
-};
 
 // Shop switcher — admins can always switch shops; a supervisor only sees
 // this if explicitly granted `can_switch_location` (per-staff override,
@@ -152,7 +130,12 @@ function NavItem({ item, currentPath, onClick, mobile }) {
 }
 
 export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
-  const items = NAV_BY_ROLE[staff.role] || [];
+  // Nav only renders what this person can access -- their role's
+  // defaults plus any per-staff extra grants (see lib/modules.js and
+  // Staff admin's "Extra module access"). No greyed-out items
+  // cluttering a screen built for speed.
+  const allowedModules = effectiveModules(staff);
+  const items = MODULE_CATALOG.filter((module) => allowedModules.includes(module.key));
   const showQuickSell = staff.role === 'admin' || staff.role === 'supervisor';
   const showLocationSwitcher =
     staff.role === 'admin' || (staff.role === 'supervisor' && staff.canSwitchLocation);
@@ -163,18 +146,62 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
   // current selection until the admin explicitly switches away from it.
   const switchableLocations = locations.filter((loc) => loc.is_active);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [businessConfig, setBusinessConfig] = useState(null);
+  const topBarRef = useRef(null);
+  const navRef = useRef(null);
+  const collapsedAt = useRef(0);
+
+  useEffect(() => {
+    getBusinessConfig()
+      .then(setBusinessConfig)
+      .catch((err) => console.warn('Failed to load business config for nav', err));
+  }, []);
 
   const handleNav = (path) => {
     setMobileOpen(false);
     onNavigate(path);
   };
 
+  // Collapse into hamburger whenever the full nav bar does not fit.
+  useLayoutEffect(() => {
+    const top = topBarRef.current;
+    const nav = navRef.current;
+    if (!top || !nav) return;
+    if (!collapsed && top.scrollWidth > top.clientWidth + 1) {
+      collapsedAt.current = nav.clientWidth;
+      setCollapsed(true);
+    }
+  });
+
+  // Try to expand again when the viewport gets meaningfully wider.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const ro = new ResizeObserver(() => {
+      const w = nav.clientWidth;
+      if (collapsed && w > collapsedAt.current + 40) {
+        setCollapsed(false);
+      }
+    });
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, [collapsed]);
+
+  // Re-measure if the allowed module list changes.
+  useEffect(() => {
+    setCollapsed(false);
+  }, [items.map((i) => i.key).join(',')]);
+
+  // If the menu is open and we no longer need to be collapsed, close it.
+  useEffect(() => {
+    if (!collapsed) setMobileOpen(false);
+  }, [collapsed]);
+
   return (
     <nav
+      ref={navRef}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
         padding: '10px 16px',
         borderBottom: '0.5px solid var(--border)',
         background: 'var(--surface-2)',
@@ -182,91 +209,125 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         zIndex: 100,
       }}
     >
-      <span style={{ fontWeight: 600, marginRight: 16, color: 'var(--text-primary)' }}>
-        TeziPOS
-      </span>
+      <div
+        ref={topBarRef}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          overflow: 'visible',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => handleNav(items[0]?.path || "/till")}
+          title={businessConfig?.business_name || 'TeziPOS'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            fontWeight: 600,
+            marginRight: 16,
+            color: 'var(--text-primary)',
+            whiteSpace: 'nowrap',
+            border: 'none',
+            background: 'transparent',
+            padding: 0,
+            fontSize: 'inherit',
+            cursor: 'pointer',
+          }}>
+          {businessConfig?.business_logo_url ? (
+            <img
+              src={businessConfig.business_logo_url}
+              alt={businessConfig?.business_name || 'TeziPOS'}
+              style={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
+            />
+          ) : (
+            businessConfig?.business_name || 'TeziPOS'
+          )}
+        </button>
 
-      {/* Desktop nav links */}
-      <div className="hidden md:flex items-center gap-1">
-        {items.map((item) => (
-          <NavItem
-            key={item.path}
-            item={item}
-            currentPath={currentPath}
-            onClick={() => handleNav(item.path)}
-            mobile={false}
-          />
-        ))}
+        {/* Desktop nav links */}
+        <div className={collapsed ? 'hidden' : 'flex items-center gap-1'}>
+          {items.map((item) => (
+            <NavItem
+              key={item.path}
+              item={item}
+              currentPath={currentPath}
+              onClick={() => handleNav(item.path)}
+              mobile={false}
+            />
+          ))}
 
-        {showLocationSwitcher && switchableLocations.length > 0 && (
-          <LocationSwitcher
-            locations={switchableLocations}
-            activeLocationId={activeLocationId}
-            onChange={setActiveLocationId}
-          />
-        )}
-      </div>
+          {showLocationSwitcher && switchableLocations.length > 0 && (
+            <LocationSwitcher
+              locations={switchableLocations}
+              activeLocationId={activeLocationId}
+              onChange={setActiveLocationId}
+            />
+          )}
+        </div>
 
-      <div style={{ flex: 1 }} />
+        <div style={{ flex: 1 }} />
 
-      {/* Desktop right controls */}
-      <div className="hidden md:flex items-center gap-3">
-        {showQuickSell && currentPath !== '/till' && (
+        {/* Desktop right controls */}
+        <div className={collapsed ? 'hidden' : 'flex items-center gap-3'}>
+          {showQuickSell && currentPath !== '/till' && (
+            <button
+              onClick={() => handleNav('/till')}
+              style={{
+                border: 'none',
+                background: 'none',
+                color: 'var(--text-accent)',
+                fontSize: 13,
+                textDecoration: 'underline',
+                cursor: 'pointer',
+              }}
+            >
+              Sell
+            </button>
+          )}
           <button
-            onClick={() => handleNav('/till')}
+            onClick={toggleTheme}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             style={{
               border: 'none',
               background: 'none',
-              color: 'var(--text-accent)',
-              fontSize: 13,
-              textDecoration: 'underline',
+              fontSize: 12,
+              color: 'var(--text-muted)',
               cursor: 'pointer',
             }}
           >
-            Sell
+            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
           </button>
-        )}
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
+          <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+            Sign out
+          </button>
+        </div>
+
+        {/* Mobile hamburger toggle */}
         <button
-          onClick={toggleTheme}
-          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          type="button"
+          onClick={() => setMobileOpen((v) => !v)}
+          className={collapsed ? 'block' : 'hidden'}
           style={{
             border: 'none',
-            background: 'none',
-            fontSize: 12,
-            color: 'var(--text-muted)',
+            background: 'transparent',
+            color: 'var(--text-primary)',
+            padding: 6,
+            borderRadius: 6,
             cursor: 'pointer',
           }}
+          aria-label="Toggle navigation"
         >
-          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-        </button>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
-        <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-          Sign out
+          <HamburgerIcon open={mobileOpen} />
         </button>
       </div>
-
-      {/* Mobile hamburger toggle */}
-      <button
-        type="button"
-        onClick={() => setMobileOpen((v) => !v)}
-        className="md:hidden"
-        style={{
-          border: 'none',
-          background: 'transparent',
-          color: 'var(--text-primary)',
-          padding: 6,
-          borderRadius: 6,
-          cursor: 'pointer',
-        }}
-        aria-label="Toggle navigation"
-      >
-        <HamburgerIcon open={mobileOpen} />
-      </button>
 
       {/* Mobile menu overlay */}
       {mobileOpen && (
         <div
-          className="md:hidden"
           style={{
             position: 'absolute',
             top: '100%',

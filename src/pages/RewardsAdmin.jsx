@@ -169,7 +169,7 @@ export default function RewardsAdmin() {
         Manage prizes customers can redeem using loyalty points.
       </p>
       {message && (
-        <p className="mt-4 p-3 rounded-xl bg-success/10 text-success text-sm">
+        <p className="mt-4 p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-sm">
           {message}
         </p>
       )}

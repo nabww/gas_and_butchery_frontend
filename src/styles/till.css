@@ -136,6 +136,12 @@
   color: var(--text-secondary);
 }
 
+/* Mobile tab switcher (Catalog / Cart) -- hidden on tablet/desktop,
+   where both panes already show side by side below. */
+.till-mobile-tabs {
+  display: none;
+}
+
 /* Responsive breakpoints */
 @media (max-width: 1023px) {
   .left-pane {
@@ -149,36 +155,58 @@
 }
 
 @media (max-width: 599px) {
+  .till-mobile-tabs {
+    display: block;
+    padding: 10px 16px;
+    background-color: var(--surface-2);
+    flex-shrink: 0;
+  }
+
   .till-content {
     flex-direction: column;
   }
 
-  .left-pane {
-    flex: 1 1 55%;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    min-width: unset;
-  }
-
+  /* Only one pane is shown at a time on a phone-sized screen -- there's
+     no room to squeeze both a product grid and a full cart/checkout
+     flow into shared vertical space without making the cart unusable.
+     Both panes stay mounted (just hidden) so switching tabs doesn't
+     lose scroll position or in-progress input. */
+  .left-pane,
   .right-pane {
-    flex: 1 1 45%;
+    flex: 1 1 auto;
     width: 100%;
     max-width: unset;
     min-width: unset;
-    border-left: none;
-    border-top: 1px solid var(--border-color);
     max-height: none;
+    border: none;
+  }
+
+  .till-content.mobile-view-catalog .right-pane {
+    display: none;
+  }
+
+  .till-content.mobile-view-cart .left-pane {
+    display: none;
   }
 }
 
 @media (max-width: 480px) {
-  .till-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
   .till-header h1 {
     font-size: 20px;
+  }
+}
+
+/* Below the point where title + business toggle + status dot can share
+   one row without crowding, drop the toggle to its own full-width row
+   instead of shrinking/wrapping mid-pill. */
+@media (max-width: 640px) {
+  .till-header {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .till-header-pills {
+    order: 3;
+    flex-basis: 100%;
   }
 }

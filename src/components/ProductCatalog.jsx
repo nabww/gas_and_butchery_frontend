@@ -19,6 +19,7 @@ export default function ProductCatalog({
   refreshSignal = 0,
   locationId,
   businessLabels = {},
+  hideCategoryPills = false,
 }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -146,10 +147,10 @@ export default function ProductCatalog({
   );
 
   return (
-    <div className="flex flex-col h-full bg-surface1">
+    <div className="flex flex-col h-full min-w-0 bg-surface1">
       {/* Search and category navigation */}
       <div className="sticky top-0 z-10 bg-surface1/95 backdrop-blur border-b border-borderColor p-5 space-y-4">
-        {allowedBusinesses.length > 1 && (
+        {!hideCategoryPills && allowedBusinesses.length > 1 && (
           <CategoryPills
             categories={allowedBusinesses}
             active={businessType}
@@ -193,7 +194,7 @@ export default function ProductCatalog({
       )}
 
       {/* Product grid */}
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-5 min-w-0">
         {loading ? (
           <div className="flex items-center justify-center h-48 text-textSecondary">
             Loading products...
@@ -206,7 +207,11 @@ export default function ProductCatalog({
                   <span>🔥</span>
                   <span>{brand}</span>
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                {/* Sized to the pane's actual width, not the viewport --
+                    Tailwind's grid-cols-N breakpoints are viewport-relative,
+                    which overflows badly once the till splits the screen
+                    into catalog/cart panes narrower than the viewport. */}
+                <div className="grid gap-5 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
                   {brandItems.map((product) => (
                     <GasProductCard
                       key={product.id}
@@ -223,7 +228,7 @@ export default function ProductCatalog({
             {accessories.length > 0 && (
               <section>
                 <h2 className="text-textPrimary text-xl font-bold mb-4">Accessories</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                <div className="grid gap-5 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
                   {accessories.map((product) => (
                     <RetailProductCard
                       key={product.id}
@@ -242,7 +247,7 @@ export default function ProductCatalog({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+          <div className="grid gap-5 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
             {filteredProducts.map((product) => (
               <RetailProductCard
                 key={product.id}

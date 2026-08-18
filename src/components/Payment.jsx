@@ -21,7 +21,7 @@ const formatKes = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
+export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnline }) {
   const {
     items,
     total,
@@ -44,7 +44,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [pendingPromoWins, setPendingPromoWins] = useState([]);
   const [receiptSaleId, setReceiptSaleId] = useState(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingReceiptLocalId, setPendingReceiptLocalId] = useState(null);
   const [pendingAccountCharge, setPendingAccountCharge] = useState(null);
   const [approvalPin, setApprovalPin] = useState("");
   const [approvalError, setApprovalError] = useState("");
@@ -64,15 +64,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
 
   useEffect(() => stopMpesaPolling, []);
 
-  useEffect(() => {
-    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener("online", updateOnlineStatus);
-    window.addEventListener("offline", updateOnlineStatus);
-    return () => {
-      window.removeEventListener("online", updateOnlineStatus);
-      window.removeEventListener("offline", updateOnlineStatus);
-    };
-  }, []);
+
 
   useEffect(() => {
     if (!isOnline && paymentMethod === "mpesa") {
@@ -110,6 +102,35 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
     setApprovalError("");
   }, [saleLocalId, customer?.id]);
 
+  // When the background sync later uploads a sale we completed while offline,
+  // fetch and display its receipt so the till does not get stuck.
+  useEffect(() => {
+    const onSynced = (e) => {
+      const saleServerIds = e.detail?.saleServerIds;
+      if (
+        pendingReceiptLocalId &&
+        saleServerIds?.[pendingReceiptLocalId]
+      ) {
+        const serverSaleId = saleServerIds[pendingReceiptLocalId];
+        setPendingReceiptLocalId(null);
+        getSaleReceipt(serverSaleId)
+          .then((receiptText) => {
+            setReceipt(receiptText);
+            setShowReceipt(true);
+            setTimeout(() => {
+              setShowReceipt(false);
+              setReceipt("");
+            }, 3000);
+          })
+          .catch(() => {
+            // Receipt will remain available in the sales report.
+          });
+      }
+    };
+    window.addEventListener("tezipos:sales-synced", onSynced);
+    return () => window.removeEventListener("tezipos:sales-synced", onSynced);
+  }, [pendingReceiptLocalId]);
+
   if (items.length === 0) {
     return null;
   }
@@ -124,7 +145,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
     setError("");
 
     try {
-      if (!navigator.onLine && !isOfflineSalesEnabled()) {
+      if (!isOnline && !isOfflineSalesEnabled()) {
         setError("Offline sales are disabled. Please connect to the network.");
         setLoading(false);
         return;
@@ -140,7 +161,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         // Always record locally first; helper also tries server when online.
         await recordCashSale(saleId, saleLocalId, amount);
       } else if (paymentMethod === "mpesa") {
-        if (!navigator.onLine) {
+        if (!isOnline) {
           setError("M-Pesa requires an internet connection");
           setLoading(false);
           return;
@@ -157,7 +178,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         startMpesaPolling(transaction.mpesa_transaction_id);
         return;
       } else if (paymentMethod === "account") {
-        if (!navigator.onLine) {
+        if (!isOnline) {
           setError("Account sales require an internet connection");
           setLoading(false);
           return;
@@ -220,7 +241,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         return;
       }
 
-      if (navigator.onLine) {
+      if (isOnline) {
         // Only a failure to sync the sale itself means it's still pending
         // locally. Fetching the receipt afterwards is just for display --
         // if that hiccups (slow response, brief network blip) the sale has
@@ -231,15 +252,15 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         try {
           syncResult = await syncPendingSales();
         } catch (syncErr) {
-          setError(
-            "Sale saved locally. It will sync when the connection is stable.",
-          );
-          setLoading(false);
-          return;
+          syncResult = null;
+        }
+
+        if (!syncResult) {
+          setPendingReceiptLocalId(saleLocalId);
         }
 
         const serverSaleId =
-          syncResult?.saleServerIds?.[saleLocalId] || saleId;
+          syncResult?.saleServerIds?.[saleLocalId] || saleLocalId;
         const promo = syncResult?.promoWins?.find(
           (entry) => entry.saleId === serverSaleId,
         );
@@ -265,12 +286,19 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
             setReceipt("");
             setPromoMessage("");
             onSaleCompleted?.();
-          }, 3000);
+          }, syncResult ? 3000 : 1000);
         }
       } else {
-        setError(
-          "You are offline. Sale saved locally and will sync when connection returns.",
-        );
+        setPendingReceiptLocalId(saleLocalId);
+        setReceipt("Receipt will print after sync.");
+        setShowReceipt(true);
+        setTimeout(() => {
+          resetCart();
+          setShowReceipt(false);
+          setReceipt("");
+          setPromoMessage("");
+          onSaleCompleted?.();
+        }, 1000);
       }
 
     } catch (err) {
@@ -332,17 +360,14 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer }) {
         return;
       }
 
-      const { payer } = await linkM2pesaToSale(mpesaTransactionId, realSaleId);
+      const { payer, pointsEarned, promoWins } = await linkM2pesaToSale(mpesaTransactionId, realSaleId);
       if (payer && payer.registered_via === "mpesa_auto" && !payer.consent_given_at) {
         onNewMpesaCustomer?.(payer);
       }
 
-      const promo = syncResult?.promoWins?.find(
-        (entry) => entry.saleId === realSaleId,
-      );
-      if (promo?.wins?.length) {
+      if (promoWins?.length) {
         setReceiptSaleId(realSaleId);
-        setPendingPromoWins(promo.wins);
+        setPendingPromoWins(promoWins);
         setShowPromoModal(true);
       } else {
         const receiptText = await getSaleReceipt(realSaleId);

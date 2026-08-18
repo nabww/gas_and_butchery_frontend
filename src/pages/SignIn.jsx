@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '../lib/useTheme';
-import { login } from '../lib/api';
+import { login, getBusinessConfig } from '../lib/api';
+import BrandFooter from '../components/BrandFooter';
 
 const PIN_LENGTH = 6;
 const KEYPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
@@ -9,7 +10,14 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
   const [pin, setPin] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [businessConfig, setBusinessConfig] = useState(null);
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    getBusinessConfig()
+      .then(setBusinessConfig)
+      .catch((err) => console.warn('Failed to load business config for login screen', err));
+  }, []);
 
   const handleKey = (key) => {
     setError(null);
@@ -66,6 +74,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
       style={{
         minHeight: '100vh',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'var(--surface-1)',
@@ -82,11 +91,24 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
           textAlign: 'center',
         }}
       >
+        {businessConfig?.business_logo_url && (
+          <img
+            src={businessConfig.business_logo_url}
+            alt={businessConfig?.business_name || businessName}
+            style={{
+              maxHeight: 80,
+              maxWidth: '100%',
+              margin: '0 auto 16px',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        )}
         <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 2px' }}>
-          {businessName}
+          {businessConfig?.business_name || businessName}
         </p>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 28px' }}>
-          {branch}
+          {businessConfig?.business_tagline || branch}
         </p>
 
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
@@ -169,6 +191,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
           </button>
         </div>
       </div>
+      <BrandFooter />
     </div>
   );
 }

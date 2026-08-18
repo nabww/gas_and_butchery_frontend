@@ -205,7 +205,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
   const emptyVariant = empty <= 0 ? "danger" : "info";
 
   return (
-    <div className="group flex flex-col rounded-2xl bg-surface2 border border-borderColor p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
+    <div className="group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
       <div className="flex items-start gap-3 mb-3">
         <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-surface1 border border-borderColor text-3xl shrink-0">
           🛢️

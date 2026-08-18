@@ -11,8 +11,12 @@ import {
   getLocationMpesaConfig,
   saveLocationMpesaConfig,
   resetLocationMpesaConfig,
+  getSmsConfig,
+  saveSmsConfig,
   getStoredStaff,
 } from "../lib/api";
+import { CTabs, CTabList, CTab } from "@coreui/react";
+import "@coreui/coreui/dist/css/coreui.min.css";
 
 const formatKes = (amount) =>
   `KES ${Number(amount || 0).toLocaleString("en-KE", {
@@ -359,6 +363,204 @@ function LoyaltySettingsSection({ message, setMessage }) {
           </span>{" "}
           of the total.
         </p>
+      </div>
+    </section>
+  );
+}
+
+function SmsSettingsSection({ setMessage }) {
+  const [config, setConfig] = useState(null);
+  const [form, setForm] = useState({
+    provider: "console",
+    sender_id: "",
+    api_key: "",
+    client_id: "",
+    is_active: false,
+    send_receipt_sms: false,
+    send_promo_win_sms: false,
+    send_stock_alert_sms: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    getSmsConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        setForm({
+          provider: cfg.provider || "console",
+          sender_id: cfg.sender_id || "",
+          api_key: "",
+          client_id: "",
+          is_active: !!cfg.is_active,
+          send_receipt_sms: !!cfg.send_receipt_sms,
+          send_promo_win_sms: !!cfg.send_promo_win_sms,
+          send_stock_alert_sms: !!cfg.send_stock_alert_sms,
+        });
+      })
+      .catch((err) => setMessage(err.message || "Failed to load SMS config."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    try {
+      const updated = await saveSmsConfig(form);
+      setConfig(updated);
+      setForm((f) => ({ ...f, api_key: "", client_id: "" }));
+      setMessage("SMS settings saved.");
+    } catch (err) {
+      setMessage(err.message || "Failed to save SMS settings.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const input =
+    "w-full mt-2 px-3 py-2 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm focus:outline-none focus:border-primary";
+
+  if (loading) {
+    return <div className="text-textSecondary">Loading SMS settings…</div>;
+  }
+
+  return (
+    <section className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
+      <div>
+        <p className="text-textPrimary font-semibold text-sm">Bulk SMS (Onfon Media)</p>
+        <p className="text-textMuted text-xs mt-1">
+          One business-wide sender ID/account, under Tezi's reseller agreement -- not
+          per-branch. Leave the provider on "Console (log only)" until the Onfon sender
+          ID is approved; nothing will be sent to real customers until then.
+        </p>
+      </div>
+
+      <div>
+        <label className="text-textPrimary font-semibold text-sm">Provider</label>
+        <select
+          className={input}
+          value={form.provider}
+          onChange={(e) => setForm({ ...form, provider: e.target.value })}
+          disabled={saving}>
+          <option value="console">Console (log only, no real sends)</option>
+          <option value="onfon">Onfon Media</option>
+        </select>
+      </div>
+
+      {form.provider === "onfon" && (
+        <>
+          <div>
+            <label className="text-textPrimary font-semibold text-sm">Sender ID</label>
+            <input
+              className={input}
+              value={form.sender_id}
+              onChange={(e) => setForm({ ...form, sender_id: e.target.value })}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="text-textPrimary font-semibold text-sm">API key</label>
+            <input
+              className={input}
+              type="password"
+              value={form.api_key}
+              onChange={(e) => setForm({ ...form, api_key: e.target.value })}
+              placeholder={config?.api_key_masked || "Enter API key"}
+              disabled={saving}
+            />
+            {config?.api_key_masked && (
+              <p className="text-textMuted text-xs mt-1">
+                Currently set: {config.api_key_masked}. Leave blank to keep it.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="text-textPrimary font-semibold text-sm">Client ID</label>
+            <input
+              className={input}
+              type="password"
+              value={form.client_id}
+              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+              placeholder={config?.client_id_masked || "Enter client ID"}
+              disabled={saving}
+            />
+            {config?.client_id_masked && (
+              <p className="text-textMuted text-xs mt-1">
+                Currently set: {config.client_id_masked}. Leave blank to keep it.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      <div className="border-t border-borderColor pt-5 space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.is_active}
+            onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+            disabled={saving}
+            className="w-4 h-4 accent-primary"
+          />
+          <span className="text-textPrimary text-sm font-semibold">Enable sending</span>
+        </label>
+        <p className="text-textMuted text-xs">
+          Master switch. Off means nothing sends regardless of the toggles below --
+          useful for a quick kill-switch without losing the saved configuration.
+        </p>
+      </div>
+
+      <div className="border-t border-borderColor pt-5 space-y-3">
+        <p className="text-textPrimary font-semibold text-sm">Message types</p>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.send_receipt_sms}
+            onChange={(e) => setForm({ ...form, send_receipt_sms: e.target.checked })}
+            disabled={saving}
+            className="w-4 h-4 accent-primary"
+          />
+          <span className="text-textPrimary text-sm">
+            Receipts &amp; points updates <span className="text-textMuted">(transactional -- always sends, ignores opt-out)</span>
+          </span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.send_promo_win_sms}
+            onChange={(e) => setForm({ ...form, send_promo_win_sms: e.target.checked })}
+            disabled={saving}
+            className="w-4 h-4 accent-primary"
+          />
+          <span className="text-textPrimary text-sm">
+            Promo/cashback wins <span className="text-textMuted">(promotional -- respects each customer's SMS opt-out)</span>
+          </span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.send_stock_alert_sms}
+            onChange={(e) => setForm({ ...form, send_stock_alert_sms: e.target.checked })}
+            disabled={saving}
+            className="w-4 h-4 accent-primary"
+          />
+          <span className="text-textPrimary text-sm">
+            Low-stock alerts <span className="text-textMuted">(internal, to staff/admin only)</span>
+          </span>
+        </label>
+      </div>
+
+      <div className="pt-2">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+          {saving ? "Saving…" : "Save SMS settings"}
+        </button>
       </div>
     </section>
   );
@@ -829,31 +1031,23 @@ export default function Settings() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {[
-          { key: "business", label: "Business" },
-          { key: "shops", label: "Shops" },
-          { key: "loyalty", label: "Loyalty" },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-              tab === key
-                ? "bg-primary text-onPrimary"
-                : "border border-borderColor bg-surface2 text-textSecondary hover:bg-surface3 hover:text-textPrimary"
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <CTabs activeItemKey={tab} onChange={setTab} className="mb-6 catalog-stock-tabs">
+        <CTabList variant="tabs">
+          <CTab itemKey="business">Business</CTab>
+          <CTab itemKey="shops">Shops</CTab>
+          <CTab itemKey="loyalty">Loyalty</CTab>
+          <CTab itemKey="sms">SMS</CTab>
+        </CTabList>
+      </CTabs>
 
       {tab === "business" ? (
         <BusinessConfigSection message={message} setMessage={setMessage} />
       ) : tab === "shops" ? (
         <ShopsSettingsSection message={message} setMessage={setMessage} />
-      ) : (
+      ) : tab === "loyalty" ? (
         <LoyaltySettingsSection message={message} setMessage={setMessage} />
+      ) : (
+        <SmsSettingsSection message={message} setMessage={setMessage} />
       )}
     </main>
   );
