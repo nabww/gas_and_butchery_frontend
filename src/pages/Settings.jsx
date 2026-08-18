@@ -489,11 +489,9 @@ function SmsSettingsSection({ setMessage }) {
       }}
       className="rounded-2xl bg-surface2 border border-borderColor p-5 space-y-5">
       <div>
-        <p className="text-textPrimary font-semibold text-sm">Bulk SMS (Onfon Media)</p>
+        <p className="text-textPrimary font-semibold text-sm">Bulk SMS</p>
         <p className="text-textMuted text-xs mt-1">
-          One business-wide sender ID/account, under Tezi's reseller agreement -- not
-          per-branch. Leave the provider on "Console (log only)" until the Onfon sender
-          ID is approved; nothing will be sent to real customers until then.
+          One business-wide sender ID/account
         </p>
       </div>
 
@@ -504,7 +502,7 @@ function SmsSettingsSection({ setMessage }) {
           value={form.provider}
           onChange={(e) => setForm({ ...form, provider: e.target.value })}
           disabled={saving}>
-          <option value="console">Console (log only, no real sends)</option>
+          <option value="console">Console (log only, no real sending)</option>
           <option value="onfon">Onfon Media</option>
         </select>
       </div>
