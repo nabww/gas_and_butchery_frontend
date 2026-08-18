@@ -100,7 +100,7 @@ newly selected location.
   sync actually lands (not just immediately after checkout, which would
   still show pre-sync numbers for a sale that hasn't synced yet).
 - Toggle "Offline sales" in the Till header to force local-only queueing
-  even while online (useful for testing).
+  even while online (useful for testing) - eliminated after testing completed.
 
 ## Verification
 
