@@ -565,8 +565,7 @@ function SmsSettingsSection({ setMessage }) {
           <span className="text-textPrimary text-sm font-semibold">Enable sending</span>
         </label>
         <p className="text-textMuted text-xs">
-          Master switch. Off means nothing sends regardless of the toggles below --
-          useful for a quick kill-switch without losing the saved configuration.
+          Master switch. Off means nothing sends regardless of the toggles below.
         </p>
       </div>
 
