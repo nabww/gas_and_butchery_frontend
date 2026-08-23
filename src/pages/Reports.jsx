@@ -13,6 +13,7 @@ import {
   getTopCustomersReport,
   getArAgingReport,
 } from "../lib/api";
+import { syncPendingSales } from "../lib/db/syncQueue";
 
 const TABS = [
   { id: "promotions", label: "Promotions" },
@@ -58,6 +59,7 @@ export default function Reports() {
 
   // Sync
   const [syncReport, setSyncReport] = useState(null);
+  const [autoSyncing, setAutoSyncing] = useState(false);
 
   // Ledger
   const [ledgerStart, setLedgerStart] = useState(today);
@@ -104,8 +106,36 @@ export default function Reports() {
           const data = await getCustomersReport();
           if (!cancelled) setCustomersReport(data);
         } else if (activeTab === "sync") {
-          const data = await getSyncReport(activeLocationId);
-          if (!cancelled) setSyncReport(data);
+          // Flush this device's own offline queue first -- opening the
+          // report is now the trigger, instead of a separate button an
+          // admin has to remember to press. Best-effort: if this browser
+          // is offline or has nothing queued, syncPendingSales() just
+          // no-ops/rejects quietly and the report still loads to show
+          // whatever's true server-side already.
+          if (!cancelled) setAutoSyncing(true);
+          try {
+            await syncPendingSales();
+          } catch (syncErr) {
+            console.warn("Auto-sync before sync report failed:", syncErr.message);
+          } finally {
+            if (!cancelled) setAutoSyncing(false);
+          }
+          try {
+            const data = await getSyncReport(activeLocationId);
+            if (!cancelled) setSyncReport(data);
+          } catch (reportErr) {
+            // The report itself is server-side state (pending/synced/
+            // conflict counts live in the database, not this browser), so
+            // it genuinely can't render without reaching the backend --
+            // unlike the offline queue flush above, this can't be
+            // best-effort. Give a specific, friendlier message instead of
+            // the generic "Failed to load report data." below.
+            if (!cancelled) {
+              setError(
+                "Can't reach the server to check sync status right now. This device's own pending sales will still be sent once it's back online.",
+              );
+            }
+          }
         } else if (activeTab === "ledger") {
           const data = await getLedgerReport(ledgerStart, ledgerEnd, activeLocationId);
           if (!cancelled) setLedgerReport(data);
@@ -660,38 +690,94 @@ export default function Reports() {
   };
 
   const renderSync = () => {
-    const errors = syncReport?.recentErrors || [];
-    const rows = errors.map((e, i) => ({
-      id: e.id ?? i,
-      date: new Date(e.synced_at || e.created_at).toLocaleString("en-KE"),
-      sale_id: e.id,
-      local_id: e.local_id,
-      total: Number(e.total || 0).toFixed(2),
-      method: e.payment_method,
+    if (!syncReport && autoSyncing) {
+      return (
+        <div className="flex items-center gap-2 text-textMuted text-sm">
+          <span className="w-3 h-3 border-2 border-textMuted border-t-transparent rounded-full animate-spin" />
+          Checking for pending syncs...
+        </div>
+      );
+    }
+
+    const tables = syncReport?.tables || [];
+    const totals = syncReport?.totals || { pending: 0, conflicts: 0, synced: 0 };
+    const issues = syncReport?.issues || [];
+
+    const issueRows = issues.map((i, idx) => ({
+      id: i.id ?? idx,
+      date: new Date(i.created_at).toLocaleString("en-KE"),
+      table: i.tableLabel,
+      status: i.sync_status,
+      description: i.description,
+      local_id: i.local_id,
     }));
 
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-textPrimary">Sync report</h2>
-          {renderExportButtons(rows, "sync-conflicts")}
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-textPrimary">Sync report</h2>
+            {autoSyncing && (
+              <span className="inline-flex items-center gap-1.5 text-textMuted text-xs">
+                <span className="w-3 h-3 border-2 border-textMuted border-t-transparent rounded-full animate-spin" />
+                Checking for pending syncs...
+              </span>
+            )}
+          </div>
+          {renderExportButtons(issueRows, "sync-issues")}
         </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatBox label="Pending sales" value={syncReport?.pendingSales || 0} />
-          <StatBox label="Conflicts" value={syncReport?.conflicts || 0} />
-          <StatBox label="Recent conflicts" value={errors.length} />
-          <StatBox label="Last sync" value={syncReport?.lastSync ? new Date(syncReport.lastSync).toLocaleTimeString("en-KE") : "—"} />
+          <StatBox label="Fully synced" value={totals.synced} />
+          <StatBox label="Pending" value={totals.pending} />
+          <StatBox label="Conflicts" value={totals.conflicts} />
+          <StatBox
+            label="Last sale sync"
+            value={syncReport?.lastSync ? new Date(syncReport.lastSync).toLocaleTimeString("en-KE") : "—"}
+          />
         </div>
-        <DataTable
-          columns={[
-            { key: "date", label: "Date" },
-            { key: "sale_id", label: "Sale ID" },
-            { key: "local_id", label: "Local ID" },
-            { key: "method", label: "Method" },
-            { key: "total", label: "Total", right: true },
-          ]}
-          rows={rows}
-        />
+
+        {/* Every syncable table (sales, sale items, payments, loyalty
+            points, cylinder exchanges, reward redemptions, promo wins,
+            customers) is checked individually -- a sale can finish
+            syncing while a child record (e.g. a points redemption) is
+            still stuck pending, and that used to be invisible here since
+            only the sales table was ever checked. */}
+        <div>
+          <p className="text-textSecondary text-xs font-semibold uppercase tracking-wide mb-2">
+            By record type
+          </p>
+          <DataTable
+            columns={[
+              { key: "label", label: "Record type" },
+              { key: "synced", label: "Synced", right: true },
+              { key: "pending", label: "Pending", right: true },
+              { key: "conflict", label: "Conflicts", right: true },
+            ]}
+            rows={tables.map((t) => ({ id: t.table, ...t }))}
+          />
+        </div>
+
+        {issueRows.length > 0 ? (
+          <div>
+            <p className="text-textSecondary text-xs font-semibold uppercase tracking-wide mb-2">
+              Records not fully synced
+            </p>
+            <DataTable
+              columns={[
+                { key: "date", label: "Date" },
+                { key: "table", label: "Record type" },
+                { key: "description", label: "Description" },
+                { key: "status", label: "Status", badge: true },
+              ]}
+              rows={issueRows}
+            />
+          </div>
+        ) : (
+          <p className="text-textMuted text-sm p-3 rounded-xl bg-surface2 border border-borderColor">
+            Everything has synced cleanly -- no pending or conflicted records across any table.
+          </p>
+        )}
       </div>
     );
   };
@@ -750,7 +836,11 @@ export default function Reports() {
       )}
 
       <section className="mt-6 p-4 rounded-2xl bg-surface1 border border-borderColor">
-        {loading ? (
+        {/* The sync tab renders its own shell immediately so the
+            "Checking for pending syncs..." indicator (see renderSync)
+            is actually visible while that runs, instead of being hidden
+            behind this generic loading state for the whole duration. */}
+        {loading && activeTab !== "sync" ? (
           <p className="text-textMuted text-sm">Loading report data...</p>
         ) : (
           renderContent()
@@ -841,7 +931,9 @@ function StatusBadge({ status }) {
   const styles = {
     pending: "bg-warning/10 text-warning",
     paid: "bg-success/10 text-success",
+    synced: "bg-success/10 text-success",
     unfulfilled: "bg-danger/10 text-danger",
+    conflict: "bg-danger/10 text-danger",
   };
   return (
     <span

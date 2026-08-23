@@ -400,6 +400,20 @@ async function doSyncPendingSales() {
           pmt.sync_status = serverId ? "synced" : "pending";
           await putRecord("payments", pmt);
         }
+        // Points ledger entries (earn/redeem) used to never get marked
+        // here at all, which combined with a since-fixed backend bug
+        // (balance_after NOT NULL violation on offline redemptions) meant
+        // a failed entry stayed "pending" forever -- resync sweeps only
+        // look at *sales* still marked pending (see getAllPendingSnapshots
+        // above), so once its parent sale synced, an orphaned pending
+        // ledger entry was never retried again. Marking it synced here
+        // alongside the sale is the same trust model as items/payments
+        // above; a genuinely failed merge is now rare since the backend
+        // no longer rejects the insert outright.
+        for (const pl of sale.pointsLedger || []) {
+          pl.sync_status = serverId ? "synced" : "pending";
+          await putRecord("points_ledger", pl);
+        }
       }
     }
   }

@@ -149,14 +149,16 @@ export default function ProductCatalog({
   return (
     <div className="flex flex-col h-full min-w-0 bg-surface1">
       {/* Search and category navigation */}
-      <div className="sticky top-0 z-10 bg-surface1/95 backdrop-blur border-b border-borderColor p-5 space-y-4">
+      <div className="catalog-search-header sticky top-0 z-10 bg-surface1/95 backdrop-blur border-b border-borderColor p-5 space-y-4">
         {!hideCategoryPills && allowedBusinesses.length > 1 && (
-          <CategoryPills
-            categories={allowedBusinesses}
-            active={businessType}
-            onSelect={onSelectBusiness}
-            labels={businessLabels}
-          />
+          <div className="catalog-mobile-pills">
+            <CategoryPills
+              categories={allowedBusinesses}
+              active={businessType}
+              onSelect={onSelectBusiness}
+              labels={businessLabels}
+            />
+          </div>
         )}
 
         <div className="relative flex gap-2">

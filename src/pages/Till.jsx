@@ -14,8 +14,6 @@ import Cart from "../components/Cart";
 import CustomerSelector from "../components/CustomerSelector";
 import Payment from "../components/Payment";
 import "../styles/till.css";
-import { CTabs, CTabList, CTab } from "@coreui/react";
-import "@coreui/coreui/dist/css/coreui.min.css";
 
 function useBackendOnlineStatus() {
   const [isOnline, setIsOnline] = useState(true);
@@ -47,6 +45,12 @@ function useBackendOnlineStatus() {
 }
 
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
+
+const formatKes = (amount) =>
+  `KES ${parseFloat(amount || 0).toLocaleString("en-KE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 export default function Till({ staff, onNavigate }) {
   const isOnline = useBackendOnlineStatus();
@@ -133,6 +137,7 @@ export default function Till({ staff, onNavigate }) {
     setItems,
     setDiscountAmount,
     items,
+    total,
     resetCart,
   } = useCart();
 
@@ -268,18 +273,6 @@ export default function Till({ staff, onNavigate }) {
 
       {!loading && allowedBusinesses.length > 0 && (
         <>
-          {/* Mobile-only tab switcher -- hidden on tablet/desktop, where
-              both panes already show side by side (see till.css). */}
-          <CTabs
-            activeItemKey={mobileTab}
-            onChange={setMobileTab}
-            className="till-mobile-tabs catalog-stock-tabs">
-            <CTabList variant="tabs">
-              <CTab itemKey="catalog">Catalog</CTab>
-              <CTab itemKey="cart">Cart{items.length > 0 ? ` (${items.length})` : ""}</CTab>
-            </CTabList>
-          </CTabs>
-
           <div className={`till-content mobile-view-${mobileTab}`}>
             {/* Left pane: Product catalog */}
             <div className="left-pane">
@@ -291,7 +284,6 @@ export default function Till({ staff, onNavigate }) {
                 refreshSignal={catalogRefreshKey}
                 locationId={catalogLocationId}
                 businessLabels={businessLabels}
-                hideCategoryPills
               />
             </div>
 
@@ -324,6 +316,27 @@ export default function Till({ staff, onNavigate }) {
               )}
             </div>
           </div>
+
+          {/* Phone-sized screens only (see till.css) -- a compact floating
+              pill (like an e-commerce mini-cart chip) instead of a top tab
+              strip or a full-width bottom bar, so switching panes doesn't
+              cost a whole row of chrome or read as a banner. */}
+          <button
+            type="button"
+            className="till-bottom-bar"
+            onClick={() => setMobileTab(mobileTab === "catalog" ? "cart" : "catalog")}>
+            {mobileTab === "catalog" ? (
+              <>
+                <span aria-hidden="true">🛒</span>
+                {items.length > 0 && (
+                  <span className="till-bottom-bar-badge">{items.length}</span>
+                )}
+                {items.length > 0 && <span>{formatKes(total)}</span>}
+              </>
+            ) : (
+              <span>← Catalog</span>
+            )}
+          </button>
         </>
       )}
 

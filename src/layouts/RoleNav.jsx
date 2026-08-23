@@ -198,6 +198,24 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
     if (!collapsed) setMobileOpen(false);
   }, [collapsed]);
 
+  // Close the mobile menu on an outside tap/click -- same pattern as
+  // LocationSwitcher above. navRef wraps both the hamburger button and
+  // the dropdown overlay, so a click anywhere else counts as "outside".
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleClickOutside = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target)) {
+        setMobileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [mobileOpen]);
+
   return (
     <nav
       ref={navRef}

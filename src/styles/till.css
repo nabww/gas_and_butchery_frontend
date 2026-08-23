@@ -26,6 +26,15 @@
   letter-spacing: -0.02em;
 }
 
+/* The underline under each tab's own bottom border (see CategoryPills.jsx)
+   is dropped everywhere in the till -- the header/toolbar sections already
+   have their own borders separating them from what's below, so this one
+   was just a redundant/stray extra line rather than a needed divider. */
+.till-header-pills [role="tablist"],
+.catalog-mobile-pills [role="tablist"] {
+  border-bottom: none;
+}
+
 .till-content {
   display: flex;
   flex: 1;
@@ -136,9 +145,55 @@
   color: var(--text-secondary);
 }
 
-/* Mobile tab switcher (Catalog / Cart) -- hidden on tablet/desktop,
-   where both panes already show side by side below. */
-.till-mobile-tabs {
+/* Catalog/Cart switcher on phone-sized screens is a floating pill (see
+   the max-width: 599px block below), not a top tab strip or a full-width
+   bottom bar -- keeps the already crowded top-of-screen chrome (title,
+   business toggle, search) down to one row each, and reads as a compact
+   status/action chip (like an e-commerce mini-cart) rather than a banner
+   claiming the whole bottom edge. */
+.till-bottom-bar {
+  display: none;
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.25));
+}
+
+.till-bottom-bar:active {
+  background-color: var(--primary-dark);
+}
+
+.till-bottom-bar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background-color: var(--on-primary);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* The catalog's own copy of the Retail/Gas toggle (rendered inside
+   ProductCatalog.jsx) is the mobile-only version -- hidden on tablet/
+   desktop, where the copy in .till-header (see till-header-pills below)
+   is used instead since there's no bottom bar or stacked chrome there. */
+.catalog-mobile-pills {
   display: none;
 }
 
@@ -155,15 +210,18 @@
 }
 
 @media (max-width: 599px) {
-  .till-mobile-tabs {
+  /* The header's own copy of the Retail/Gas toggle gives way to the
+     catalog's copy below -- see .catalog-mobile-pills above and
+     till-header-pills' display:none further down. */
+  .catalog-mobile-pills {
     display: block;
-    padding: 10px 16px;
-    background-color: var(--surface-2);
-    flex-shrink: 0;
   }
 
   .till-content {
     flex-direction: column;
+    /* Leave room for the floating bottom bar so the last product card /
+       cart row is never hidden underneath it. */
+    padding-bottom: 64px;
   }
 
   /* Only one pane is shown at a time on a phone-sized screen -- there's
@@ -187,6 +245,48 @@
 
   .till-content.mobile-view-cart .left-pane {
     display: none;
+  }
+
+  .till-header-pills {
+    display: none;
+  }
+
+  .till-bottom-bar {
+    display: flex;
+  }
+
+  /* Mobile header is title+status only now (pills moved below into the
+     catalog's own toolbar) -- no need for the roomier desktop padding.
+     Shadow removed so it doesn't cast onto the catalog toolbar directly
+     below it, which now shares the same background/border treatment to
+     read as one continuous bar rather than two stacked cards. */
+  .till-header {
+    padding: 10px 16px;
+    box-shadow: none;
+  }
+
+  /* Visually continue straight on from .till-header as one toolbar
+     instead of a separate floating card -- same solid background, no
+     backdrop-blur/border seam, and just enough padding to not touch
+     edges. Tighter than the desktop p-5/space-y-4 (Tailwind's space-y-4
+     adds margin-top between children, not a flex gap, hence overriding
+     it directly here). */
+  .catalog-search-header {
+    padding: 10px 16px !important;
+    background-color: var(--surface-2) !important;
+    backdrop-filter: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+
+  .catalog-search-header > * + * {
+    margin-top: 8px !important;
+  }
+
+  /* Smaller, tighter tabs on a phone-width toolbar than the desktop
+     category filter (which has a whole row to itself). */
+  .catalog-mobile-pills button {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
   }
 }
 

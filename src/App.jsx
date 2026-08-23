@@ -29,8 +29,6 @@ const LANDING_BY_ROLE = {
   admin: "/dashboard",
 };
 
-// Placeholder pages -- real implementations ship in their assigned
-// build phase. These exist so navigation and routing are provable now.
 function Placeholder({ name }) {
   return (
     <div style={{ padding: 32, color: "var(--text-secondary)" }}>

@@ -751,8 +751,13 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
             <label className="block text-xs font-medium text-textSecondary mb-1">
               Method
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {["cash", "mpesa", "account"].map((option) => (
+            <div className="grid grid-cols-2 gap-2">
+              {/* Settling an invoice with "account" would mean charging
+                  the corporate account's own credit to pay off its own
+                  debt -- not a real settlement, so it's not offered here
+                  (unlike the till's payment methods, where charging a
+                  sale to the account is the point). */}
+              {["cash", "mpesa"].map((option) => (
                 <button
                   key={option}
                   type="button"
