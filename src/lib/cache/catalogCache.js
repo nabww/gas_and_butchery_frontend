@@ -34,7 +34,6 @@ export async function getCachedProducts(businessType = null) {
 }
 
 export async function loadProducts(businessType = null, locationId) {
-  console.log("loadProducts:", { businessType, locationId, online: navigator.onLine });
   if (navigator.onLine) {
     try {
       return await refreshProductCache(businessType, locationId);

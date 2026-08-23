@@ -104,7 +104,6 @@ export default function ProductCatalog({
         setProducts([...gasItems, ...accessories]);
       } else {
         const data = await loadCachedProducts(businessType, locationId);
-        console.log("Catalog load:", { businessType, data });
         const filtered = Array.isArray(data)
           ? data.filter((p) => p.business_type === businessType)
           : [];

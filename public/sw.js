@@ -31,10 +31,23 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  // Only ever handle plain http(s) GETs. Browser extensions (PDF viewers,
+  // password managers, etc.) issue their own requests -- chrome-extension://,
+  // moz-extension://, and similar -- through the same page, which this
+  // handler used to try to cache.put() unconditionally; the Cache API
+  // rejects non-http(s) schemes and non-GET methods outright, which
+  // surfaced as a wall of "Uncaught (in promise) TypeError" console spam
+  // with nothing actually wrong on TeziPOS's side.
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
   // API calls (/api/*) are never cache-first -- they go through the
   // IndexedDB-backed sync queue (see lib/db/syncQueue.js), not the
   // service worker cache.
-  if (event.request.url.includes('/api/')) return;
+  if (request.url.includes('/api/')) return;
 
   // Navigation requests (the HTML shell itself) always go network-first.
   // This is the file that names every other hashed asset, so serving a
