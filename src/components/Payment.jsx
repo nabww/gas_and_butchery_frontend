@@ -11,6 +11,7 @@ import {
 import { recordCashSale, recordMpesaSale, recordAccountSale } from "../lib/saleOperations";
 import { syncPendingSales } from "../lib/db/syncQueue";
 import { isOfflineSalesEnabled } from "../lib/settings";
+import { printReceipt } from "../lib/receipt";
 import { useCart } from "../contexts/CartContext";
 import Checkmark from "./Checkmark";
 import PromoWinModal from "./PromoWinModal";
@@ -541,27 +542,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     }, 3000);
   };
 
-  const handlePrintReceipt = () => {
-    if (!receipt) return;
-    const printWindow = window.open("", "_blank", "width=400,height=700");
-    printWindow.document.write(
-      `<!DOCTYPE html>
-<html>
-<head>
-<title>Receipt</title>
-<style>
-  body { font-family: monospace; font-size: 14px; margin: 20px; white-space: pre; }
-</style>
-</head>
-<body>${receipt.replace(/</g, "&lt;")}</body>
-</html>`,
-    );
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 200);
-  };
+  const handlePrintReceipt = () => printReceipt(receipt);
 
   const canCheckout =
     !loading &&

@@ -12,8 +12,10 @@ import {
   getLedgerReport,
   getTopCustomersReport,
   getArAgingReport,
+  getSaleReceipt,
 } from "../lib/api";
 import { syncPendingSales } from "../lib/db/syncQueue";
+import { printReceipt } from "../lib/receipt";
 
 const TABS = [
   { id: "promotions", label: "Promotions" },
@@ -60,6 +62,9 @@ export default function Reports() {
   // Sync
   const [syncReport, setSyncReport] = useState(null);
   const [autoSyncing, setAutoSyncing] = useState(false);
+
+  // Receipt reprints from the Sales report
+  const [printingSaleIds, setPrintingSaleIds] = useState(new Set());
 
   // Ledger
   const [ledgerStart, setLedgerStart] = useState(today);
@@ -128,7 +133,7 @@ export default function Reports() {
             // conflict counts live in the database, not this browser), so
             // it genuinely can't render without reaching the backend --
             // unlike the offline queue flush above, this can't be
-            // best-effort. Give a specific, friendlier message instead of
+            // best-effort. So we give a specific, friendlier message instead of
             // the generic "Failed to load report data." below.
             if (!cancelled) {
               setError(
@@ -402,6 +407,23 @@ export default function Reports() {
     );
   };
 
+  const handlePrintSaleReceipt = async (saleId) => {
+    if (printingSaleIds.has(saleId)) return;
+    setPrintingSaleIds((prev) => new Set(prev).add(saleId));
+    try {
+      const receipt = await getSaleReceipt(saleId);
+      printReceipt(receipt);
+    } catch (err) {
+      alert(err.message || "Failed to load receipt");
+    } finally {
+      setPrintingSaleIds((prev) => {
+        const next = new Set(prev);
+        next.delete(saleId);
+        return next;
+      });
+    }
+  };
+
   const renderSales = () => {
     const summary = salesReport?.summary;
     const sales = salesReport?.sales || [];
@@ -470,6 +492,19 @@ export default function Reports() {
             { key: "discount", label: "Discount", right: true },
             { key: "total", label: "Total", right: true },
             { key: "items", label: "Items" },
+            {
+              key: "print",
+              label: "Receipt",
+              render: (row) => (
+                <button
+                  type="button"
+                  onClick={() => handlePrintSaleReceipt(row.id)}
+                  disabled={printingSaleIds.has(row.id)}
+                  className="px-2 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors disabled:opacity-50">
+                  {printingSaleIds.has(row.id) ? "Loading..." : "Print"}
+                </button>
+              ),
+            },
           ]}
           rows={rows}
         />
@@ -888,11 +923,7 @@ function DataTable({ columns, rows }) {
               <tr key={row.id ?? idx} className="border-t border-borderColor text-textPrimary">
                 {columns.map((col) => {
                   const raw = row[col.key];
-                  const content = col.badge ? (
-                    <StatusBadge status={raw} />
-                  ) : (
-                    raw
-                  );
+                  const content = col.render ? col.render(row) : col.badge ? <StatusBadge status={raw} /> : raw;
                   return (
                     <td
                       key={col.key}
