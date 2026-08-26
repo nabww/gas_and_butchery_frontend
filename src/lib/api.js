@@ -1,5 +1,8 @@
 import { cacheCredential, verifyOfflinePin } from "./auth/credentialCache";
 
+
+
+
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV
@@ -61,18 +64,54 @@ export async function login(pin) {
   return data;
 }
 
-export function getStoredStaff() {
-  const raw = localStorage.getItem(STAFF_KEY);
-  return raw ? JSON.parse(raw) : null;
-}
-
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+// Extract the `exp` claim from a JWT without pulling in a jwt library.
+// The payload is the second segment, base64url-encoded.
+function getTokenExp(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+    const json = atob(padded);
+    const { exp } = JSON.parse(json);
+    return exp ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isTokenExpired(token = getToken()) {
+  if (!token) return true;
+  const exp = getTokenExp(token);
+  return !exp || Date.now() >= exp;
 }
 
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(STAFF_KEY);
+  // Same-tab signal so any mounted App can re-render to the login screen
+  // when a 401 or explicit sign-out happens, since localStorage changes
+  // don't fire storage events in the same tab.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("tezipos:logout"));
+  }
+}
+
+export function getStoredStaff() {
+  const token = getToken();
+  if (!token || isTokenExpired(token)) {
+    logout();
+    return null;
+  }
+  const raw = localStorage.getItem(STAFF_KEY);
+  if (!raw) {
+    logout();
+    return null;
+  }
+  return JSON.parse(raw);
 }
 
 export async function apiFetch(path, options = {}) {
