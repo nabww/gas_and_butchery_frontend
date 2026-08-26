@@ -45,6 +45,20 @@ export default function App() {
   const [path, setPath] = useState(null);
   const [isOnline, setIsOnline] = useState(true);
 
+  // Re-evaluate the stored session when another tab signs out or when a 401
+  // somewhere in the app calls logout(). This is what flips the app back to
+  // the login screen on an expired/revoked token without the user having to
+  // manually refresh the page.
+  useEffect(() => {
+    const handleLogout = () => setStaff(getStoredStaff());
+    window.addEventListener("tezipos:logout", handleLogout);
+    window.addEventListener("storage", handleLogout);
+    return () => {
+      window.removeEventListener("tezipos:logout", handleLogout);
+      window.removeEventListener("storage", handleLogout);
+    };
+  }, []);
+
   useEffect(() => {
     registerServiceWorker();
 
