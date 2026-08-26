@@ -179,7 +179,7 @@ export default function Reports() {
   );
 
   const renderExportButtons = (rows, filename) => (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2 shrink-0">
       <button
         onClick={() => downloadCsv(rows, `${filename}.csv`)}
         className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors">
@@ -443,19 +443,21 @@ export default function Reports() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-textPrimary">Sales report</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto max-w-full">
             <input
               type="date"
               value={salesStart}
+              max={salesEnd}
               onChange={(e) => setSalesStart(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
-            <span className="text-textSecondary text-sm">to</span>
+            <span className="text-textSecondary text-sm shrink-0">to</span>
             <input
               type="date"
               value={salesEnd}
+              min={salesStart}
               onChange={(e) => setSalesEnd(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
             {renderExportButtons(rows, "sales-report")}
           </div>
@@ -528,19 +530,21 @@ export default function Reports() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-textPrimary">Top customers</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto max-w-full">
             <input
               type="date"
               value={topCustomersStart}
+              max={topCustomersEnd}
               onChange={(e) => setTopCustomersStart(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
-            <span className="text-textSecondary text-sm">to</span>
+            <span className="text-textSecondary text-sm shrink-0">to</span>
             <input
               type="date"
               value={topCustomersEnd}
+              min={topCustomersStart}
               onChange={(e) => setTopCustomersEnd(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
             {renderExportButtons(rows, "top-customers")}
           </div>
@@ -574,6 +578,9 @@ export default function Reports() {
       amount: Number(data.total || 0).toFixed(2),
     }));
     rows.push(
+      { category: "Expense", item: "Stock purchases", count: "", amount: Number(expenses?.stock || 0).toFixed(2) },
+      { category: "Expense", item: "Gas refills", count: "", amount: Number(expenses?.refills || 0).toFixed(2) },
+      { category: "Expense", item: "Operating expenses", count: "", amount: Number(expenses?.operating || 0).toFixed(2) },
       { category: "Expense", item: "Cashback payouts", count: Number(expenses?.promoCashbackCount || 0), amount: Number(expenses?.promoCashback || 0).toFixed(2) },
       { category: "Expense", item: "Prize payouts", count: Number(expenses?.promoPrizesCount || 0), amount: Number(expenses?.promoPrizes || 0).toFixed(2) },
       { category: "Expense", item: "Reward redemptions", count: Number(expenses?.rewardsCount || 0), amount: Number(expenses?.rewards || 0).toFixed(2) },
@@ -583,19 +590,21 @@ export default function Reports() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-textPrimary">Income & expenses ledger</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto max-w-full">
             <input
               type="date"
               value={ledgerStart}
+              max={ledgerEnd}
               onChange={(e) => setLedgerStart(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
-            <span className="text-textSecondary text-sm">to</span>
+            <span className="text-textSecondary text-sm shrink-0">to</span>
             <input
               type="date"
               value={ledgerEnd}
+              min={ledgerStart}
               onChange={(e) => setLedgerEnd(e.target.value)}
-              className="px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+              className="min-w-0 flex-1 sm:flex-none px-2 py-1.5 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
             />
             {renderExportButtons(rows, "ledger")}
           </div>
@@ -613,6 +622,20 @@ export default function Reports() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatBox
+            label="Recorded purchases & costs"
+            value={Number(expenses?.postedCount || 0)}
+            sub={`KES ${Number(expenses?.posted || 0).toFixed(2)}`}
+          />
+          <StatBox
+            label="Stock purchases"
+            value={`KES ${Number(expenses?.stock || 0).toFixed(2)}`}
+            sub={`Gas refills: KES ${Number(expenses?.refills || 0).toFixed(2)}`}
+          />
+          <StatBox
+            label="Operating expenses"
+            value={`KES ${Number(expenses?.operating || 0).toFixed(2)}`}
+          />
           <StatBox
             label="Cashback payouts"
             value={Number(expenses?.promoCashbackCount || 0)}

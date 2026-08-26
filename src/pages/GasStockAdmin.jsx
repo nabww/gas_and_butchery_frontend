@@ -5,6 +5,7 @@ import {
   updateStockThreshold,
   getOversellFlags,
   resolveOversellFlag,
+  createGasRefill,
 } from "../lib/api";
 import CylinderBrandForm from "../components/CylinderBrandForm";
 import { useActiveLocation } from "../contexts/LocationContext";
@@ -24,6 +25,7 @@ function StockRow({
   isExpanded,
   onCancelEdit,
   activeLocationId,
+  onRefill,
 }) {
   const [editing, setEditing] = useState(false);
   const [filledQty, setFilledQty] = useState(item.filled_qty);
@@ -167,11 +169,16 @@ function StockRow({
                 </button>
               </div>
             ) : (
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 flex-wrap">
                 <button
                   onClick={() => onEdit(item)}
                   className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
                   Edit
+                </button>
+                <button
+                  onClick={() => onRefill(item)}
+                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                  Refill
                 </button>
                 <button
                   onClick={() => setEditing(true)}
@@ -202,6 +209,187 @@ function StockRow({
   );
 }
 
+function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
+  const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [reference, setReference] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const qty = parseInt(quantity, 10);
+    const cost = parseFloat(unitCost);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      setError("Enter a valid refill quantity");
+      return;
+    }
+    if (qty > item.empty_qty) {
+      setError(`Only ${item.empty_qty} empty cylinders available`);
+      return;
+    }
+    if (!Number.isFinite(cost) || cost < 0) {
+      setError("Enter a valid unit cost");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await createGasRefill({
+        location_id: activeLocationId,
+        cylinder_brand_id: item.cylinder_brand_id,
+        quantity: qty,
+        unit_cost: cost,
+        supplier_name: supplierName.trim() || undefined,
+        reference: reference.trim() || undefined,
+        payment_method: paymentMethod,
+        expense_date: expenseDate,
+        notes: notes.trim() || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err.message || "Failed to record refill");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface2 border border-borderColor p-6 shadow-lg space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-textPrimary">
+            Refill {item.brand} {item.weight_kg}kg
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 rounded-lg border border-borderColor bg-surface1 text-textSecondary text-xs font-semibold hover:bg-surface3">
+            Close
+          </button>
+        </div>
+
+        <div className="p-3 rounded-xl bg-surface1 border border-borderColor">
+          <p className="text-textSecondary text-xs">Empty cylinders available</p>
+          <p className="text-textPrimary text-xl font-bold">{item.empty_qty}</p>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm font-medium">
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-textMuted text-xs block mb-1">Quantity</label>
+            <input
+              type="number"
+              min="1"
+              max={item.empty_qty}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className={inputClass}
+              required
+            />
+          </div>
+          <div>
+            <label className="text-textMuted text-xs block mb-1">Unit cost</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              className={inputClass}
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-textMuted text-xs block mb-1">Supplier</label>
+          <input
+            value={supplierName}
+            onChange={(e) => setSupplierName(e.target.value)}
+            className={inputClass}
+            placeholder="Supplier name"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-textMuted text-xs block mb-1">Reference</label>
+            <input
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              className={inputClass}
+              placeholder="Invoice / receipt"
+            />
+          </div>
+          <div>
+            <label className="text-textMuted text-xs block mb-1">Payment method</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className={inputClass}>
+              <option value="cash">Cash</option>
+              <option value="mpesa">M-Pesa</option>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="cheque">Cheque</option>
+              <option value="credit">Credit</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-textMuted text-xs block mb-1">Expense date</label>
+          <input
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            className={inputClass}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="text-textMuted text-xs block mb-1">Notes</label>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={inputClass}
+            placeholder="Optional notes"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+            {saving ? "Saving..." : "Record refill"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-borderColor bg-surface1 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function GasStockAdmin({ staffRole }) {
   const { activeLocationId } = useActiveLocation();
   const [stock, setStock] = useState([]);
@@ -212,6 +400,7 @@ export default function GasStockAdmin({ staffRole }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const [refillItem, setRefillItem] = useState(null);
   const isAdmin = staffRole === "admin";
 
   const loadStock = useCallback(async () => {
@@ -291,6 +480,19 @@ export default function GasStockAdmin({ staffRole }) {
         </div>
       )}
 
+      {refillItem && (
+        <GasRefillModal
+          item={refillItem}
+          activeLocationId={activeLocationId}
+          onClose={() => setRefillItem(null)}
+          onSaved={() => {
+            setRefillItem(null);
+            loadStock();
+            showToast("Refill recorded.");
+          }}
+        />
+      )}
+
       {isAdmin && !showForm && (
         <button
           type="button"
@@ -343,8 +545,8 @@ export default function GasStockAdmin({ staffRole }) {
         </div>
       )}
 
-      <div className="mt-6 rounded-2xl bg-surface2 border border-borderColor overflow-hidden">
-        <table className="w-full">
+      <div className="mt-6 rounded-2xl bg-surface2 border border-borderColor overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-borderColor bg-surface1">
               <th className="py-3 px-4 text-left text-textSecondary text-xs font-semibold uppercase tracking-wide">
@@ -384,6 +586,7 @@ export default function GasStockAdmin({ staffRole }) {
                   setExpandedId(null);
                   setEditing(null);
                 }}
+                onRefill={setRefillItem}
               />
             ))}
             {stock.length === 0 && !loading && (

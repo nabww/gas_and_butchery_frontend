@@ -3,6 +3,7 @@ import SignIn from "./pages/SignIn";
 import RoleNav from "./layouts/RoleNav";
 import Till from "./pages/Till";
 import CatalogStockAdmin from "./pages/CatalogStockAdmin";
+import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 import RewardsAdmin from "./pages/RewardsAdmin";
 import PromotionsAdmin from "./pages/PromotionsAdmin";
@@ -169,6 +170,8 @@ export default function App() {
           <CustomersAdmin staffRole={staff.role} />
         ) : currentPath === "/catalog" || currentPath === "/stock" ? (
           <CatalogStockAdmin staffRole={staff.role} />
+        ) : currentPath === "/expenses" ? (
+          <Expenses />
         ) : currentPath === "/settings" ? (
           <Settings />
         ) : currentPath === "/rewards" ? (

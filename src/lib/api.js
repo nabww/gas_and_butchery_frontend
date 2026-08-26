@@ -816,3 +816,37 @@ export async function uploadBusinessLogo(file) {
 
   return data;
 }
+
+// ========== EXPENSES API ==========
+
+export async function getExpenses({ startDate, endDate, businessType, category, locationId }) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  if (businessType) params.set("business_type", businessType);
+  if (category) params.set("category", category);
+  if (locationId) params.set("location_id", locationId);
+  const query = params.toString();
+  return apiFetch(`/expenses${query ? `?${query}` : ""}`);
+}
+
+export async function createExpense(payload) {
+  return apiFetch("/expenses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createGasRefill(payload) {
+  return apiFetch("/expenses/gas-refills", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function voidExpense(expenseId, locationId) {
+  return apiFetch(`/expenses/${expenseId}/void`, {
+    method: "POST",
+    body: JSON.stringify(locationId ? { location_id: locationId } : {}),
+  });
+}

@@ -22,7 +22,29 @@ const formatKes = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const localIsoDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const rangeStart = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() - (days - 1));
+  return localIsoDate(date);
+};
+
+const previousPeriod = (startDate, endDate) => {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const days = Math.round((end - start) / 86400000) + 1;
+  const previousEnd = new Date(start);
+  previousEnd.setDate(previousEnd.getDate() - 1);
+  const previousStart = new Date(previousEnd);
+  previousStart.setDate(previousStart.getDate() - (days - 1));
+  return { start: localIsoDate(previousStart), end: localIsoDate(previousEnd) };
+};
 
 function TrendChart({ data, height = 200 }) {
   if (!data || data.length === 0) return null;
@@ -130,13 +152,15 @@ export default function Dashboard({ onNavigate }) {
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [payoutError, setPayoutError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [startDate, setStartDate] = useState(() => localIsoDate());
+  const [endDate, setEndDate] = useState(() => localIsoDate());
 
-  const date = useMemo(() => todayIso(), []);
-  const prevDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
-  }, []);
+  const priorPeriod = useMemo(
+    () => previousPeriod(startDate, endDate),
+    [startDate, endDate],
+  );
+  const isToday = startDate === localIsoDate() && endDate === localIsoDate();
+  const periodLabel = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
 
   const activeLocationName = useMemo(() => {
     const loc = locations.find((l) => String(l.id) === String(activeLocationId));
@@ -163,14 +187,14 @@ export default function Dashboard({ onNavigate }) {
           trendData,
           pendingRewardsData,
         ] = await Promise.all([
-          getSalesReport(date, date, activeLocationId).catch(() => null),
-          getSalesReport(prevDate, prevDate, activeLocationId).catch(() => null),
-          getLoyaltyReport(date, date).catch(() => null),
+          getSalesReport(startDate, endDate, activeLocationId).catch(() => null),
+          getSalesReport(priorPeriod.start, priorPeriod.end, activeLocationId).catch(() => null),
+          getLoyaltyReport(startDate, endDate).catch(() => null),
           getArAgingReport().catch(() => null),
-          getLedgerReport(date, date, activeLocationId).catch(() => null),
+          getLedgerReport(startDate, endDate, activeLocationId).catch(() => null),
           getLowStockAlerts(activeLocationId).catch(() => []),
           getOversellFlags(false, activeLocationId).catch(() => []),
-          getTopCustomersReport(date, date, activeLocationId).catch(() => ({ customers: [] })),
+          getTopCustomersReport(startDate, endDate, activeLocationId).catch(() => ({ customers: [] })),
           listLocations().catch(() => []),
           getDailyTrend(14, activeLocationId).catch(() => ({ points: [] })),
           // Not date-scoped on purpose -- a pending cashback/reward from a
@@ -202,7 +226,7 @@ export default function Dashboard({ onNavigate }) {
     return () => {
       cancelled = true;
     };
-  }, [date, activeLocationId, refreshKey]);
+  }, [startDate, endDate, priorPeriod.start, priorPeriod.end, activeLocationId, refreshKey]);
 
   const handleIssuePayout = async () => {
     if (!selectedPayout) return;
@@ -238,6 +262,8 @@ export default function Dashboard({ onNavigate }) {
   const overdue = (ar?.buckets?.["1to30"] || 0) + (ar?.buckets?.["31to60"] || 0) + (ar?.buckets?.["over60"] || 0);
   const income = ledger?.income || {};
   const expenses = ledger?.expenses || {};
+  const restockExpenses = Number(expenses?.stock || 0) + Number(expenses?.refills || 0);
+  const operatingExpenses = Number(expenses?.operating || 0);
   // Credit sold today that hasn't been collected yet -- shown as negative
   // since it's money extended, not money in hand.
   const creditBalance = -(income?.creditExtended || 0);
@@ -265,11 +291,11 @@ export default function Dashboard({ onNavigate }) {
     const items = [];
     if (revenue > 0 && prevRevenue > 0) {
       const direction = revenue >= prevRevenue ? "up" : "down";
-      items.push(`Revenue is ${direction} ${Math.abs(revenueChange).toFixed(1)}% from yesterday (${formatKes(prevRevenue)}).`);
+      items.push(`Revenue is ${direction} ${Math.abs(revenueChange).toFixed(1)}% from the previous equivalent period (${formatKes(prevRevenue)}).`);
     } else if (revenue > 0 && prevRevenue === 0) {
-      items.push("Today is the first day with recorded revenue for this location.");
+      items.push("The selected period has revenue while the previous equivalent period had none.");
     } else if (revenue === 0 && prevRevenue > 0) {
-      items.push("No revenue recorded yet today, though yesterday had sales.");
+      items.push("No revenue was recorded in the selected period, though the previous equivalent period had sales.");
     }
     if (lowStock.length > 0) {
       items.push(`${lowStock.length} item(s) at or below their low-stock threshold — consider restocking.`);
@@ -285,7 +311,7 @@ export default function Dashboard({ onNavigate }) {
     }
     if (discounts > revenue * 0.15) {
       items.push(
-        "Today's discounts (manual + loyalty points redeemed) exceed 15% of revenue — review discount patterns.",
+        "Discounts in the selected period (manual + loyalty points redeemed) exceed 15% of revenue — review discount patterns.",
       );
     }
     if (mpesa > 0 && mpesa + cash + account === 0) {
@@ -306,12 +332,53 @@ export default function Dashboard({ onNavigate }) {
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
-      <header className="mb-6">
-        <h1 className="text-textPrimary text-2xl font-bold">Dashboard</h1>
-        <p className="text-textSecondary text-sm mt-1">
-          Snapshot for {date}
-          {activeLocationName ? ` · ${activeLocationName}` : ""}
-        </p>
+      <header className="mb-6 space-y-4">
+        <div>
+          <h1 className="text-textPrimary text-2xl font-bold">Dashboard</h1>
+          <p className="text-textSecondary text-sm mt-1">
+            Snapshot for {periodLabel}
+            {activeLocationName ? ` · ${activeLocationName}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-xs text-textMuted mb-1">From</label>
+            <input
+              type="date"
+              value={startDate}
+              max={endDate}
+              onChange={(event) => setStartDate(event.target.value)}
+              className="px-3 py-2 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-textMuted mb-1">To</label>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              max={localIsoDate()}
+              onChange={(event) => setEndDate(event.target.value)}
+              className="px-3 py-2 rounded-lg bg-surface1 border border-borderColor text-textPrimary text-sm"
+            />
+          </div>
+          {[
+            ["Today", 1],
+            ["7 days", 7],
+            ["30 days", 30],
+          ].map(([label, days]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                setStartDate(rangeStart(days));
+                setEndDate(localIsoDate());
+              }}
+              className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:text-textPrimary hover:bg-surface3">
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
       {error && (
@@ -351,10 +418,36 @@ export default function Dashboard({ onNavigate }) {
         <KpiCard label="Cash" value={formatKes(cash)} />
         <KpiCard label="M-Pesa" value={formatKes(mpesa)} />
         <KpiCard
-          label="Total income"
+          label="Net cash movement"
           value={formatKes(totalIncome)}
-          subtext="Cash/M-Pesa + collections, less today's costs"
+          subtext="Collected income less recorded costs for this period"
           tone={totalIncome >= 0 ? "success" : "danger"}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard
+          label="Restock expenses"
+          value={formatKes(restockExpenses)}
+          subtext={`${formatKes(expenses?.stock || 0)} inventory · ${formatKes(expenses?.refills || 0)} gas refills`}
+          tone={restockExpenses > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          label="Operating expenses"
+          value={formatKes(operatingExpenses)}
+          subtext="Transport, utilities, wages and other costs"
+          tone={operatingExpenses > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          label="All expenses"
+          value={formatKes(expenses?.total || 0)}
+          subtext="Restocks, operating costs, promotions and rewards"
+          tone={Number(expenses?.total || 0) > 0 ? "danger" : "default"}
+        />
+        <KpiCard
+          label="Recorded expense entries"
+          value={expenses?.postedCount || 0}
+          subtext={isToday ? "Posted today" : "Posted in selected period"}
         />
       </section>
 
@@ -366,9 +459,9 @@ export default function Dashboard({ onNavigate }) {
           tone="warning"
         />
         <KpiCard
-          label="Today's loyalty liability"
+          label="Period loyalty liability"
           value={formatKes(loyaltyLiability)}
-          subtext="Net new points value earned today"
+          subtext="Net new points value earned in the selected period"
           tone={loyaltyLiability > 0 ? "warning" : "default"}
         />
         <KpiCard label="Pending promo payouts" value={formatKes(pendingPromo)} subtext={`${pendingPromoCount} pending`} tone="danger" />
@@ -379,12 +472,12 @@ export default function Dashboard({ onNavigate }) {
         <KpiCard
           label="Credit balance"
           value={formatKes(creditBalance)}
-          subtext={`${income?.creditExtendedCount || 0} credit sale(s) today, unpaid`}
+          subtext={`${income?.creditExtendedCount || 0} credit sale(s) in the selected period, unpaid`}
           tone={creditBalance < 0 ? "warning" : "default"}
         />
         <KpiCard label="Low-stock items" value={lowStock.length} tone={lowStock.length > 0 ? "warning" : "default"} />
         <KpiCard label="Unresolved oversells" value={oversells.length} tone={oversells.length > 0 ? "danger" : "default"} />
-        <KpiCard label="Top customer today" value={formatKes(topCustomers[0]?.total_spend || 0)} subtext={topCustomers[0]?.name || "No sales yet"} />
+        <KpiCard label="Top customer in period" value={formatKes(topCustomers[0]?.total_spend || 0)} subtext={topCustomers[0]?.name || "No sales yet"} />
       </section>
 
       {recentSales.length > 0 && (
