@@ -10,6 +10,40 @@ const API_BASE =
     : `${window.location.protocol}//${window.location.hostname}:4000/api`);
 const TOKEN_KEY = "tezipos-token";
 const STAFF_KEY = "tezipos-staff";
+const API_URL = new URL(API_BASE, window.location.origin);
+const API_PATH = API_URL.pathname.replace(/\/$/, "");
+
+export function resolveApiAssetUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("/uploads/")) return `${API_BASE}${url}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith("/uploads/") && ["localhost", "127.0.0.1"].includes(parsed.hostname)) {
+      return `${API_BASE}${parsed.pathname}`;
+    }
+  } catch {
+    return url;
+  }
+  return url;
+}
+
+function normalizeBusinessConfig(config) {
+  return config ? { ...config, business_logo_url: resolveApiAssetUrl(config.business_logo_url) } : config;
+}
+
+function logoUrlForStorage(url) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === API_URL.origin && parsed.pathname.startsWith(`${API_PATH}/uploads/`)) {
+      return parsed.pathname.slice(API_PATH.length);
+    }
+    if (parsed.origin === API_URL.origin && parsed.pathname.startsWith("/uploads/")) return parsed.pathname;
+  } catch {
+    return url;
+  }
+  return url;
+}
 
 export async function login(pin) {
   const tryOfflineFallback = async () => {
@@ -779,14 +813,18 @@ export async function uploadSyncSnapshot(snapshot) {
 }
 
 export async function getBusinessConfig() {
-  return apiFetch("/config");
+  return normalizeBusinessConfig(await apiFetch("/config"));
 }
 
 export async function updateBusinessConfig(updates) {
-  return apiFetch("/config", {
+  const payload = { ...updates };
+  if (Object.hasOwn(payload, "business_logo_url")) {
+    payload.business_logo_url = logoUrlForStorage(payload.business_logo_url);
+  }
+  return normalizeBusinessConfig(await apiFetch("/config", {
     method: "PATCH",
-    body: JSON.stringify(updates),
-  });
+    body: JSON.stringify(payload),
+  }));
 }
 
 export async function uploadBusinessLogo(file) {
@@ -814,7 +852,7 @@ export async function uploadBusinessLogo(file) {
     throw err;
   }
 
-  return data;
+  return normalizeBusinessConfig(data);
 }
 
 // ========== EXPENSES API ==========
@@ -839,6 +877,13 @@ export async function createExpense(payload) {
 
 export async function createGasRefill(payload) {
   return apiFetch("/expenses/gas-refills", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createGasPurchase(payload) {
+  return apiFetch("/expenses/gas-purchases", {
     method: "POST",
     body: JSON.stringify(payload),
   });

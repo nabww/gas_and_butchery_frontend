@@ -17,6 +17,7 @@ import {
   getOversellFlags,
   resolveOversellFlag,
   createGasRefill,
+  createGasPurchase,
 } from "../lib/api";
 import CylinderBrandForm from "../components/CylinderBrandForm";
 import { useActiveLocation } from "../contexts/LocationContext";
@@ -347,6 +348,7 @@ function GasStockRow({
   onCancelEdit,
   activeLocationId,
   onRefill,
+  onPurchase,
 }) {
   const [editing, setEditing] = useState(false);
   const [filledQty, setFilledQty] = useState(item.filled_qty);
@@ -502,6 +504,11 @@ function GasStockRow({
                   Refill
                 </button>
                 <button
+                  onClick={() => onPurchase(item)}
+                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                  Purchase filled
+                </button>
+                <button
                   onClick={() => setEditing(true)}
                   className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
                   Adjust stock
@@ -530,7 +537,8 @@ function GasStockRow({
   );
 }
 
-function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
+function GasRefillModal({ item, activeLocationId, onClose, onSaved, mode = "refill" }) {
+  const isRefill = mode === "refill";
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
   const [supplierName, setSupplierName] = useState("");
@@ -546,10 +554,10 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
     const qty = parseInt(quantity, 10);
     const cost = parseFloat(unitCost);
     if (!Number.isInteger(qty) || qty <= 0) {
-      setError("Enter a valid refill quantity");
+      setError("Enter a valid quantity");
       return;
     }
-    if (qty > item.empty_qty) {
+    if (isRefill && qty > item.empty_qty) {
       setError(`Only ${item.empty_qty} empty cylinders available`);
       return;
     }
@@ -560,7 +568,7 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
     setSaving(true);
     setError("");
     try {
-      await createGasRefill({
+      const payload = {
         location_id: activeLocationId,
         cylinder_brand_id: item.cylinder_brand_id,
         quantity: qty,
@@ -570,10 +578,15 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
         payment_method: paymentMethod,
         expense_date: expenseDate,
         notes: notes.trim() || undefined,
-      });
+      };
+      if (isRefill) {
+        await createGasRefill(payload);
+      } else {
+        await createGasPurchase(payload);
+      }
       onSaved();
     } catch (err) {
-      setError(err.message || "Failed to record refill");
+      setError(err.message || `Failed to record ${isRefill ? "refill" : "purchase"}`);
     } finally {
       setSaving(false);
     }
@@ -586,7 +599,7 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
         className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface2 border border-borderColor p-6 shadow-lg space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-textPrimary">
-            Refill {item.brand} {item.weight_kg}kg
+            {isRefill ? "Refill" : "Purchase filled"} {item.brand} {item.weight_kg}kg
           </h2>
           <button
             type="button"
@@ -597,8 +610,12 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
         </div>
 
         <div className="p-3 rounded-xl bg-surface1 border border-borderColor">
-          <p className="text-textSecondary text-xs">Empty cylinders available</p>
-          <p className="text-textPrimary text-xl font-bold">{item.empty_qty}</p>
+          <p className="text-textSecondary text-xs">
+            {isRefill ? "Empty cylinders available" : "Filled cylinders currently in stock"}
+          </p>
+          <p className="text-textPrimary text-xl font-bold">
+            {isRefill ? item.empty_qty : item.filled_qty}
+          </p>
         </div>
 
         {error && (
@@ -613,7 +630,7 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
             <input
               type="number"
               min="1"
-              max={item.empty_qty}
+              max={isRefill ? item.empty_qty : undefined}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               className={inputClass}
@@ -697,7 +714,7 @@ function GasRefillModal({ item, activeLocationId, onClose, onSaved }) {
             type="submit"
             disabled={saving}
             className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
-            {saving ? "Saving..." : "Record refill"}
+            {saving ? "Saving..." : `Record ${isRefill ? "refill" : "purchase"}`}
           </button>
           <button
             type="button"
@@ -906,6 +923,7 @@ function GasStockTab({ staffRole }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [refillItem, setRefillItem] = useState(null);
+  const [purchaseItem, setPurchaseItem] = useState(null);
   const isAdmin = staffRole === "admin";
 
   const loadStock = useCallback(async () => {
@@ -979,6 +997,20 @@ function GasStockTab({ staffRole }) {
             setRefillItem(null);
             loadStock();
             showToast("Refill recorded.");
+          }}
+        />
+      )}
+
+      {purchaseItem && (
+        <GasRefillModal
+          mode="purchase"
+          item={purchaseItem}
+          activeLocationId={activeLocationId}
+          onClose={() => setPurchaseItem(null)}
+          onSaved={() => {
+            setPurchaseItem(null);
+            loadStock();
+            showToast("Purchase recorded.");
           }}
         />
       )}
@@ -1086,6 +1118,7 @@ function GasStockTab({ staffRole }) {
                     setEditing(null);
                   }}
                   onRefill={setRefillItem}
+                  onPurchase={setPurchaseItem}
                 />
               ))
             )}
@@ -1187,14 +1220,14 @@ function GasStockTab({ staffRole }) {
                             title={
                               stockAdjusted
                                 ? "Mark this oversell as reviewed"
-                                : "Edit the stock quantity above to reflect the actual on-hand count before resolving"
+                                : "Record a refill or purchase that covers the unresolved shortage before resolving"
                             }
                             className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-40 disabled:cursor-not-allowed">
                             Resolve
                           </button>
                           {!stockAdjusted && (
                             <p className="text-textMuted text-xs mt-1">
-                              Adjust stock first
+                              Refill or purchase first
                             </p>
                           )}
                         </td>

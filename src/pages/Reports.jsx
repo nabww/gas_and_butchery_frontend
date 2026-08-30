@@ -186,7 +186,7 @@ export default function Reports() {
         CSV
       </button>
       <button
-        onClick={() => downloadExcel(rows, `${filename}.xlsx`)}
+        onClick={() => downloadExcel(rows, `${filename}.xls`)}
         className="px-3 py-1.5 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors">
         Excel
       </button>
@@ -999,16 +999,8 @@ function StatusBadge({ status }) {
   );
 }
 
-async function download(rows, filename, type) {
-  const XLSX = await import("xlsx");
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-  const wbout = XLSX.write(workbook, { bookType: type, type: "array" });
-  const blob = new Blob([wbout], {
-    type: type === "csv" ? "text/csv;charset=utf-8;" : "application/octet-stream",
-  });
-  const url = URL.createObjectURL(blob);
+function saveDownload(content, filename, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -1018,10 +1010,26 @@ async function download(rows, filename, type) {
   URL.revokeObjectURL(url);
 }
 
+function spreadsheetValue(value) {
+  const text = String(value ?? "");
+  return /^[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
 function downloadCsv(rows, filename) {
-  download(rows, filename, "csv");
+  const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const quote = (value) => `"${spreadsheetValue(value).replaceAll('"', '""')}"`;
+  const csv = [columns.map(quote), ...rows.map((row) => columns.map((column) => quote(row[column])))].map((line) => line.join(",")).join("\r\n");
+  saveDownload(`\ufeff${csv}`, filename, "text/csv;charset=utf-8");
 }
 
 function downloadExcel(rows, filename) {
-  download(rows, filename, "xlsx");
+  const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const escape = (value) => spreadsheetValue(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+  const header = columns.map((column) => `<th>${escape(column)}</th>`).join("");
+  const body = rows.map((row) => `<tr>${columns.map((column) => `<td>${escape(row[column])}</td>`).join("")}</tr>`).join("");
+  saveDownload(`\ufeff<html><head><meta charset="utf-8"></head><body><table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></body></html>`, filename, "application/vnd.ms-excel;charset=utf-8");
 }
