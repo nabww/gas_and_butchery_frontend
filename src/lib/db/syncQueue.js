@@ -183,6 +183,7 @@ export async function redeemLocalPoints(localSaleId, customerId, points, kesValu
     sale_local_id: localSaleId,
     type: "redeem",
     points,
+    kes_value: kesValue,
     balance_after: null,
     sync_status: "pending",
     created_at: nowIso(),
@@ -325,6 +326,7 @@ function buildSnapshotForGroup(locationId, salesInGroup) {
           sale_local_id: s.local_id,
           type: pl.type,
           points: pl.points,
+          kes_value: pl.kes_value,
           balance_after: pl.balance_after,
         })),
       ),
@@ -336,6 +338,16 @@ function buildSnapshotForGroup(locationId, salesInGroup) {
 
 async function doSyncPendingSales() {
   const pending = await getAllPendingSnapshots();
+  const pendingSaleIds = new Set(pending.map((sale) => sale.local_id));
+  const pendingPoints = await getByIndex("points_ledger", "sync_status", "pending");
+  for (const entry of pendingPoints) {
+    if (!entry.sale_local_id || pendingSaleIds.has(entry.sale_local_id)) continue;
+    const snapshot = await getPendingSaleSnapshot(entry.sale_local_id);
+    if (snapshot) {
+      pending.push(snapshot);
+      pendingSaleIds.add(entry.sale_local_id);
+    }
+  }
   if (pending.length === 0) {
     return { syncComplete: true, synced: 0, errors: 0, conflicts: 0 };
   }

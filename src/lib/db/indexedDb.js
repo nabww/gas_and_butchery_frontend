@@ -4,7 +4,7 @@
 // merges, oversell flagging, etc.) is Phase 1 work.
 
 const DB_NAME = 'tezipos-local';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 // One object store per syncable entity, keyed by local_id (a UUID
 // generated on-device — see schema.sql sync-metadata columns).
@@ -23,7 +23,7 @@ const STORES = [
 
 const CACHE_STORES = ['products', 'cylinder_brands', 'customers'];
 
-const CHILD_STORES = ['sale_items', 'cylinder_exchanges', 'payments'];
+const CHILD_STORES = ['sale_items', 'cylinder_exchanges', 'payments', 'points_ledger'];
 
 let dbPromise = null;
 

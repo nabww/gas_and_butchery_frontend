@@ -258,6 +258,8 @@ export default function Dashboard({ onNavigate }) {
   const mpesa = sales?.summary?.byMethod?.mpesa || 0;
   const account = sales?.summary?.byMethod?.account || 0;
   const discounts = sales?.summary?.totalDiscount || 0;
+  const pointRedemptions = sales?.summary?.totalRedemptions || 0;
+  const pointRedemptionCount = sales?.summary?.redemptionCount || 0;
   const loyaltyLiability = loyalty?.dailyLiability || 0;
   const overdue = (ar?.buckets?.["1to30"] || 0) + (ar?.buckets?.["31to60"] || 0) + (ar?.buckets?.["over60"] || 0);
   const income = ledger?.income || {};
@@ -311,7 +313,7 @@ export default function Dashboard({ onNavigate }) {
     }
     if (discounts > revenue * 0.15) {
       items.push(
-        "Discounts in the selected period (manual + loyalty points redeemed) exceed 15% of revenue — review discount patterns.",
+        "Manual and approved discounts in the selected period exceed 15% of revenue — review discount patterns.",
       );
     }
     if (mpesa > 0 && mpesa + cash + account === 0) {
@@ -451,12 +453,18 @@ export default function Dashboard({ onNavigate }) {
         />
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <KpiCard
           label="Discounts"
           value={formatKes(discounts)}
-          subtext="Manual discounts + loyalty points redeemed at checkout"
+          subtext="Manual and approved discounts"
           tone="warning"
+        />
+        <KpiCard
+          label="Points redemptions"
+          value={formatKes(pointRedemptions)}
+          subtext={`${pointRedemptionCount} redemptions at checkout`}
+          tone="success"
         />
         <KpiCard
           label="Period loyalty liability"

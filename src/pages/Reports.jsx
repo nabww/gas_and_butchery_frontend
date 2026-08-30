@@ -434,7 +434,8 @@ export default function Reports() {
       staff: s.staff_name || "—",
       method: s.payment_method,
       subtotal: Number(s.subtotal || 0).toFixed(2),
-      discount: Number(s.discount_amount || 0).toFixed(2),
+      discount: Number(s.manual_discount_amount || 0).toFixed(2),
+      redemption: Number(s.redemption_amount || 0).toFixed(2),
       total: Number(s.total || 0).toFixed(2),
       items: (s.items || []).map((i) => i.product_name || i.cylinder_brand || "Item").join(", "),
     }));
@@ -464,13 +465,18 @@ export default function Reports() {
         </div>
 
         {summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <StatBox label="Transactions" value={summary.totalSales} />
             <StatBox label="Revenue" value={`KES ${Number(summary.totalRevenue || 0).toFixed(2)}`} />
             <StatBox
               label="Discounts"
               value={`KES ${Number(summary.totalDiscount || 0).toFixed(2)}`}
-              sub="Manual discounts + loyalty points redeemed"
+              sub="Manual and approved discounts"
+            />
+            <StatBox
+              label="Points redemptions"
+              value={`KES ${Number(summary.totalRedemptions || 0).toFixed(2)}`}
+              sub={`${Number(summary.redemptionCount || 0)} redemptions · ${Number(summary.pointsRedeemed || 0)} points`}
             />
             <StatBox label="Methods" value={Object.keys(summary.byMethod || {}).length} />
           </div>
@@ -492,6 +498,7 @@ export default function Reports() {
             { key: "method", label: "Method" },
             { key: "subtotal", label: "Subtotal", right: true },
             { key: "discount", label: "Discount", right: true },
+            { key: "redemption", label: "Points redemption", right: true },
             { key: "total", label: "Total", right: true },
             { key: "items", label: "Items" },
             {
@@ -578,6 +585,7 @@ export default function Reports() {
       amount: Number(data.total || 0).toFixed(2),
     }));
     rows.push(
+      { category: "Redemption", item: "Loyalty points redeemed", count: Number(income?.pointRedemptionCount || 0), amount: Number(income?.pointRedemptions || 0).toFixed(2) },
       { category: "Expense", item: "Stock purchases", count: "", amount: Number(expenses?.stock || 0).toFixed(2) },
       { category: "Expense", item: "Gas refills", count: "", amount: Number(expenses?.refills || 0).toFixed(2) },
       { category: "Expense", item: "Operating expenses", count: "", amount: Number(expenses?.operating || 0).toFixed(2) },
@@ -610,7 +618,12 @@ export default function Reports() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <StatBox
+            label="Points redemptions"
+            value={`KES ${Number(income?.pointRedemptions || 0).toFixed(2)}`}
+            sub={`${Number(income?.pointRedemptionCount || 0)} redemptions · ${Number(income?.pointsRedeemed || 0)} points`}
+          />
           <StatBox label="Total income" value={`KES ${Number(income?.total || 0).toFixed(2)}`} />
           <StatBox label="Total expenses" value={`KES ${Number(expenses?.total || 0).toFixed(2)}`} />
           <StatBox label="Net income" value={`KES ${Number(net || 0).toFixed(2)}`} />
