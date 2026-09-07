@@ -519,10 +519,10 @@ export async function generateConsolidatedInvoice(corporateAccountId, coversUpTo
   });
 }
 
-export async function recordInvoicePayment(invoiceId, amount, method = "cash") {
+export async function recordInvoicePayment(invoiceId, amount, method = "cash", clientReference) {
   return apiFetch(`/corporate/invoices/${invoiceId}/payments`, {
     method: "POST",
-    body: JSON.stringify({ amount: parseFloat(amount), method }),
+    body: JSON.stringify({ amount: parseFloat(amount), method, client_reference: clientReference }),
   });
 }
 

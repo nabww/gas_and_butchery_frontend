@@ -402,6 +402,7 @@ const buildInvoiceHtml = (invoice, account, config = {}) => {
               <span>Balance due</span>
               <span>${formatKes(Math.max(0, (parseFloat(invoice?.total || 0) || 0) - (parseFloat(invoice?.paid_amount || 0) || 0)))}</span>
             </div>
+            ${(parseFloat(invoice?.overpayment_amount || 0) || 0) > 0 ? `<div class="totals-row"><span>Overpayment credit</span><span>${formatKes(invoice.overpayment_amount)}</span></div>` : ""}
             <div class="totals-row total">
               <span>Grand total</span>
               <span>${formatKes(invoice?.total || 0)}</span>
@@ -670,31 +671,52 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [mpesaPhone, setMpesaPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [overpaymentToConfirm, setOverpaymentToConfirm] = useState(null);
+  const submittingRef = useRef(false);
+  const paymentReferenceRef = useRef("");
 
   useEffect(() => {
-    if (open && amountDue) {
+    if (open) {
       setAmount(String(parseFloat(amountDue || 0).toFixed(2)));
       setMethod("cash");
       setMpesaPhone("");
+      setOverpaymentToConfirm(null);
+      submittingRef.current = false;
+      paymentReferenceRef.current = crypto.randomUUID();
     }
   }, [open, amountDue]);
 
   if (!open) return null;
 
-  const submit = () => {
+  const executeSubmission = async (numeric) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setOverpaymentToConfirm(null);
+    try {
+      await onSubmit({
+        invoiceId,
+        amount: numeric,
+        method,
+        phone: method === "mpesa" ? mpesaPhone.trim() : undefined,
+        clientReference: paymentReferenceRef.current,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submit = async () => {
+    if (submittingRef.current || overpaymentToConfirm) return;
     const numeric = Number.parseFloat(amount);
-    if (!amount || Number.isNaN(numeric) || numeric <= 0) {
+    if (!amount || Number.isNaN(numeric) || numeric <= 0) return;
+    if (method === "mpesa" && !mpesaPhone.trim()) return;
+    if (numeric > Number(amountDue || 0)) {
+      setOverpaymentToConfirm(numeric);
       return;
     }
-    if (method === "mpesa" && !mpesaPhone.trim()) {
-      return;
-    }
-    onSubmit({
-      invoiceId,
-      amount: numeric,
-      method,
-      phone: method === "mpesa" ? mpesaPhone.trim() : undefined,
-    });
+    await executeSubmission(numeric);
   };
 
   return (
@@ -717,7 +739,8 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
           <button
             type="button"
             onClick={onClose}
-            className="text-textMuted hover:text-textPrimary text-sm">
+            disabled={submitting}
+            className="text-textMuted hover:text-textPrimary text-sm disabled:opacity-50">
             ✕
           </button>
         </div>
@@ -762,6 +785,7 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
                   key={option}
                   type="button"
                   onClick={() => setMethod(option)}
+                  disabled={submitting}
                   className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide border ${
                     method === option
                       ? "bg-primary text-onPrimary border-primary"
@@ -810,16 +834,40 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold">
+            disabled={submitting}
+            className="px-3 py-2 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold disabled:opacity-50">
             Cancel
           </button>
           <button
             type="submit"
-            className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold">
-            Save payment
+            disabled={submitting}
+            aria-busy={submitting}
+            className="px-3 py-2 rounded-lg bg-primary text-onPrimary text-xs font-semibold disabled:opacity-50">
+            {submitting ? "Processing…" : "Save payment"}
           </button>
         </div>
       </form>
+
+      {overpaymentToConfirm !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="overpayment-title" className="w-full max-w-sm rounded-2xl bg-surface1 border border-warning/40 p-5 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-warning">Overpayment confirmation</p>
+            <h3 id="overpayment-title" className="mt-2 text-lg font-bold text-textPrimary">Record more than the balance due?</h3>
+            <div className="mt-4 space-y-2 rounded-xl bg-warning/10 border border-warning/30 p-3 text-sm">
+              <div className="flex justify-between gap-3 text-textSecondary"><span>Balance due</span><strong className="text-textPrimary">{formatKes(amountDue)}</strong></div>
+              <div className="flex justify-between gap-3 text-textSecondary"><span>Amount entered</span><strong className="text-textPrimary">{formatKes(overpaymentToConfirm)}</strong></div>
+              <div className="flex justify-between gap-3 text-warning"><span>Overpayment credit</span><strong>{formatKes(overpaymentToConfirm - Number(amountDue || 0))}</strong></div>
+            </div>
+            <p className="mt-3 text-xs text-textMuted">The excess will be recorded as credit on the corporate account.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setOverpaymentToConfirm(null)} className="px-3 py-2 rounded-lg border border-borderColor text-textSecondary text-xs font-semibold">Go back</button>
+              <button type="button" onClick={() => executeSubmission(overpaymentToConfirm)} disabled={submitting} aria-busy={submitting} className="px-3 py-2 rounded-lg bg-warning text-slate-950 text-xs font-bold disabled:opacity-50">
+                {submitting ? "Recording…" : "Confirm overpayment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -971,6 +1019,7 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
     method = "cash",
     amountOverride = null,
     phone = "",
+    clientReference = null,
   ) => {
     const amount = amountOverride ?? Number.parseFloat(amountDue || 0);
     if (!amount || Number.isNaN(amount) || amount <= 0) return;
@@ -1001,7 +1050,7 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
             if (status?.pending === false || resultCode !== "") {
               stopMpesaPolling();
               if (resultCode === "0" || status?.resultCode === "0") {
-                await recordInvoicePayment(invoiceId, amount, "mpesa");
+                await recordInvoicePayment(invoiceId, amount, "mpesa", clientReference);
                 load();
                 onUpdated();
                 setPaymentStatus("Payment received");
@@ -1040,7 +1089,7 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
     }
 
     try {
-      await recordInvoicePayment(invoiceId, amount, method);
+      await recordInvoicePayment(invoiceId, amount, method, clientReference);
       load();
       onUpdated();
       setPaymentStatus("Payment received");
@@ -1113,8 +1162,8 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
           setPaymentModal({ open: false, invoiceId: null, amountDue: 0 });
           setPaymentStatus("");
         }}
-        onSubmit={({ invoiceId, amount, method, phone }) =>
-          payInvoice(invoiceId, paymentModal.amountDue, method, amount, phone)
+        onSubmit={({ invoiceId, amount, method, phone, clientReference }) =>
+          payInvoice(invoiceId, paymentModal.amountDue, method, amount, phone, clientReference)
         }
       />
 
@@ -1289,6 +1338,12 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
                   <span>Paid</span>
                   <span>{formatKes(selectedInvoice.paid_amount || 0)}</span>
                 </div>
+                {Number(selectedInvoice.overpayment_amount || 0) > 0 && (
+                  <div className="flex items-center justify-between font-semibold text-success">
+                    <span>Overpayment credit</span>
+                    <span>{formatKes(selectedInvoice.overpayment_amount)}</span>
+                  </div>
+                )}
                 <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-base font-bold text-slate-900">
                   <span>Balance due</span>
                   <span>
@@ -1506,6 +1561,11 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
                         {inv.status === "partial" && (
                           <span className="text-warning block text-xs">
                             {formatKes(Math.max(0, parseFloat(inv.total || 0) - parseFloat(inv.paid_amount || 0)))} due
+                          </span>
+                        )}
+                        {Number(inv.overpayment_amount || 0) > 0 && (
+                          <span className="text-success block text-xs font-semibold">
+                            {formatKes(inv.overpayment_amount)} overpayment
                           </span>
                         )}
                       </td>

@@ -181,3 +181,27 @@ button:active {
     transform: translateY(0);
   }
 }
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button[aria-busy='true'],
+.action-loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.login-wiggle {
+  animation: login-wiggle 0.55s ease-in-out infinite;
+}
+
+@keyframes login-wiggle {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-wiggle { animation: none; }
+}

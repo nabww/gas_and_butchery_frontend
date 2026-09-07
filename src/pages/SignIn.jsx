@@ -11,6 +11,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [businessConfig, setBusinessConfig] = useState(null);
+  const submittingRef = useRef(false);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
   }, []);
 
   const handleKey = (key) => {
+    if (submittingRef.current) return;
     setError(null);
     if (key === 'del') {
       setPin((p) => p.slice(0, -1));
@@ -36,6 +38,8 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
   };
 
   const submit = async (fullPin) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const result = await login(fullPin);
@@ -44,6 +48,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
       setError(err.message || 'Invalid PIN');
       setPin('');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -115,7 +120,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
           Enter your PIN
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
+        <div className={submitting ? 'login-wiggle' : ''} style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <span
               key={i}
@@ -130,6 +135,12 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
             />
           ))}
         </div>
+
+        {submitting && (
+          <p role="status" aria-live="polite" style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-warning)', margin: '0 0 12px' }}>
+            Logging in…
+          </p>
+        )}
 
         {error && (
           <p style={{ fontSize: 13, color: 'var(--text-danger)', margin: '0 0 12px' }}>
@@ -154,6 +165,8 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
                 key={i}
                 onClick={() => handleKey(key)}
                 disabled={submitting}
+                aria-busy={submitting}
+                className={submitting ? 'action-loading' : ''}
                 style={{ height: 60, fontSize: key === 'del' ? 16 : 20 }}
               >
                 {key === 'del' ? '⌫' : key}

@@ -1,5 +1,18 @@
+import { useState } from "react";
+
 export default function PayoutActionModal({ payout, onClose, onIssue, onUnfulfilled }) {
+  const [processing, setProcessing] = useState("");
   if (!payout) return null;
+
+  const runAction = async (action, handler) => {
+    if (processing) return;
+    setProcessing(action);
+    try {
+      await handler();
+    } finally {
+      setProcessing("");
+    }
+  };
 
   const title =
     payout.type === "cashback"
@@ -33,20 +46,25 @@ export default function PayoutActionModal({ payout, onClose, onIssue, onUnfulfil
         <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
-            onClick={onIssue}
-            className="w-full py-2.5 rounded-xl bg-primary text-onPrimary text-sm font-semibold hover:bg-primaryDark transition-colors">
-            {payout.type === "cashback" ? "Mark as paid" : "Mark as issued"}
+            onClick={() => runAction("issue", onIssue)}
+            disabled={!!processing}
+            aria-busy={processing === "issue"}
+            className="w-full py-2.5 rounded-xl bg-primary text-onPrimary text-sm font-semibold hover:bg-primaryDark transition-colors disabled:opacity-50">
+            {processing === "issue" ? "Processing…" : payout.type === "cashback" ? "Mark as paid" : "Mark as issued"}
           </button>
           <button
             type="button"
-            onClick={onUnfulfilled}
-            className="w-full py-2.5 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors">
-            Mark as unfulfilled
+            onClick={() => runAction("unfulfilled", onUnfulfilled)}
+            disabled={!!processing}
+            aria-busy={processing === "unfulfilled"}
+            className="w-full py-2.5 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors disabled:opacity-50">
+            {processing === "unfulfilled" ? "Processing…" : "Mark as unfulfilled"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl text-textSecondary text-sm font-semibold hover:bg-surface3 transition-colors">
+            disabled={!!processing}
+            className="w-full py-2.5 rounded-xl text-textSecondary text-sm font-semibold hover:bg-surface3 transition-colors disabled:opacity-50">
             Cancel
           </button>
         </div>
