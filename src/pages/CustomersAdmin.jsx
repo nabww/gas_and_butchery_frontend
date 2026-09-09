@@ -325,7 +325,7 @@ export default function CustomersAdmin({ staffRole }) {
   }, [query]);
 
   return (
-    <main className="p-6 max-w-4xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-textPrimary">Customers</h1>
       <p className="text-textSecondary text-sm mt-1">
         Registration, consent, and promotional SMS preference. M-Pesa auto-registered customers

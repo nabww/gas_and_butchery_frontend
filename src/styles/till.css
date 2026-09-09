@@ -12,8 +12,11 @@
   padding: 14px 24px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   box-shadow: var(--shadow-sm);
   z-index: 20;
   flex-shrink: 0;
@@ -24,6 +27,63 @@
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  flex: 0 0 auto;
+}
+
+.till-business-segments {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  flex: 0 0 auto;
+}
+
+.till-business-segments button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.till-business-segments button.active {
+  background: var(--surface-2);
+  box-shadow: 0 0 0 0.5px var(--border);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.till-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.till-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.till-status-dot.online {
+  background: var(--fill-success);
+}
+
+.till-status-dot.offline {
+  background: var(--status-warning);
 }
 
 /* The underline under each tab's own bottom border (see CategoryPills.jsx)
@@ -171,8 +231,34 @@
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.25));
 }
 
-.till-bottom-bar:active {
-  background-color: var(--primary-dark);
+button.till-bottom-bar.show-cart {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: var(--on-primary);
+}
+
+button.till-bottom-bar.show-catalog {
+  background: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  color: var(--surface-1);
+}
+
+button.till-bottom-bar.show-cart:hover,
+button.till-bottom-bar.show-cart:active {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+button.till-bottom-bar.show-catalog:hover,
+button.till-bottom-bar.show-catalog:active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+button.till-bottom-bar:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 3px;
 }
 
 .till-bottom-bar-badge {
@@ -210,6 +296,14 @@
 }
 
 @media (max-width: 599px) {
+  .till-status-text {
+    display: none;
+  }
+
+  .till-status-pill {
+    gap: 0;
+  }
+
   /* The header's own copy of the Retail/Gas toggle gives way to the
      catalog's copy below -- see .catalog-mobile-pills above and
      till-header-pills' display:none further down. */
@@ -251,8 +345,15 @@
     display: none;
   }
 
+  .right-section,
+  .till-actions {
+    padding: 10px;
+  }
+
   .till-bottom-bar {
     display: flex;
+    right: 10px;
+    bottom: 10px;
   }
 
   /* Mobile header is title+status only now (pills moved below into the
@@ -261,7 +362,7 @@
      below it, which now shares the same background/border treatment to
      read as one continuous bar rather than two stacked cards. */
   .till-header {
-    padding: 10px 16px;
+    padding: 8px 10px;
     box-shadow: none;
   }
 
@@ -272,7 +373,7 @@
      adds margin-top between children, not a flex gap, hence overriding
      it directly here). */
   .catalog-search-header {
-    padding: 10px 16px !important;
+    padding: 8px 10px !important;
     background-color: var(--surface-2) !important;
     backdrop-filter: none !important;
     border-bottom: 1px solid var(--border-color) !important;
@@ -301,12 +402,7 @@
    instead of shrinking/wrapping mid-pill. */
 @media (max-width: 640px) {
   .till-header {
-    flex-wrap: wrap;
-    row-gap: 10px;
-  }
-
-  .till-header-pills {
-    order: 3;
-    flex-basis: 100%;
+    flex-wrap: nowrap;
+    gap: 12px;
   }
 }

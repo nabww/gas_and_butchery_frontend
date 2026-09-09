@@ -287,7 +287,7 @@ export default function CatalogAdmin({ staffRole }) {
   };
 
   return (
-    <main className="p-6 max-w-6xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-textPrimary">Catalog</h1>

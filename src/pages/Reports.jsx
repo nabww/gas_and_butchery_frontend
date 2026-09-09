@@ -436,6 +436,8 @@ export default function Reports() {
       subtotal: Number(s.subtotal || 0).toFixed(2),
       discount: Number(s.manual_discount_amount || 0).toFixed(2),
       redemption: Number(s.redemption_amount || 0).toFixed(2),
+      cogs: Number(s.cogs_amount || 0).toFixed(2),
+      gross_profit: Number(s.gross_profit || 0).toFixed(2),
       total: Number(s.total || 0).toFixed(2),
       items: (s.items || []).map((i) => i.product_name || i.cylinder_brand || "Item").join(", "),
     }));
@@ -469,14 +471,14 @@ export default function Reports() {
             <StatBox label="Transactions" value={summary.totalSales} />
             <StatBox label="Revenue" value={`KES ${Number(summary.totalRevenue || 0).toFixed(2)}`} />
             <StatBox
-              label="Discounts"
-              value={`KES ${Number(summary.totalDiscount || 0).toFixed(2)}`}
-              sub="Manual and approved discounts"
+              label="COGS"
+              value={`KES ${Number(summary.totalCOGS || 0).toFixed(2)}`}
+              sub="Cost of goods sold"
             />
             <StatBox
-              label="Points redemptions"
-              value={`KES ${Number(summary.totalRedemptions || 0).toFixed(2)}`}
-              sub={`${Number(summary.redemptionCount || 0)} redemptions · ${Number(summary.pointsRedeemed || 0)} points`}
+              label="Gross profit"
+              value={`KES ${Number(summary.totalGrossProfit || 0).toFixed(2)}`}
+              sub={`Margin ${(summary.grossProfitMargin || 0).toFixed(1)}%`}
             />
             <StatBox label="Methods" value={Object.keys(summary.byMethod || {}).length} />
           </div>
@@ -499,6 +501,8 @@ export default function Reports() {
             { key: "subtotal", label: "Subtotal", right: true },
             { key: "discount", label: "Discount", right: true },
             { key: "redemption", label: "Points redemption", right: true },
+            { key: "cogs", label: "COGS", right: true },
+            { key: "gross_profit", label: "Gross profit", right: true },
             { key: "total", label: "Total", right: true },
             { key: "items", label: "Items" },
             {
@@ -881,7 +885,7 @@ export default function Reports() {
   };
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-textPrimary">Reports</h1>
       <p className="text-textSecondary text-sm mt-1">
         Overview of sales, promotions, inventory, loyalty, and accounts.

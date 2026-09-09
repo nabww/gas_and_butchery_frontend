@@ -712,6 +712,20 @@ export async function getOversellFlags(includeResolved = false, locationId) {
   return apiFetch(`/stock-admin/oversells${query}`);
 }
 
+export async function listStockTransfers(locationId, limit = 100) {
+  const query = new URLSearchParams();
+  if (locationId) query.set("location_id", locationId);
+  query.set("limit", limit);
+  return apiFetch(`/stock-admin/transfers?${query.toString()}`);
+}
+
+export async function createStockTransfer(payload) {
+  return apiFetch("/stock-admin/transfers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function resolveOversellFlag(flagId) {
   return apiFetch(`/stock-admin/oversells/${flagId}/resolve`, {
     method: "PUT",
@@ -787,6 +801,12 @@ export async function getInsights(locationId) {
   const params = new URLSearchParams();
   if (locationId) params.set("location_id", locationId);
   return apiFetch(`/reports/insights?${params.toString()}`);
+}
+
+export async function getInventoryValue(locationId) {
+  const params = new URLSearchParams();
+  if (locationId) params.set("location_id", locationId);
+  return apiFetch(`/reports/inventory-value?${params.toString()}`);
 }
 
 export async function getFastMovingProducts(startDate, endDate, locationId, sortBy = "revenue", limit = 20) {
@@ -884,6 +904,20 @@ export async function createGasRefill(payload) {
 
 export async function createGasPurchase(payload) {
   return apiFetch("/expenses/gas-purchases", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createGasRestock(payload) {
+  return apiFetch("/expenses/gas-restock", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createProductRestock(payload) {
+  return apiFetch("/expenses/product-restock", {
     method: "POST",
     body: JSON.stringify(payload),
   });

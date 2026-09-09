@@ -54,7 +54,7 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
         }}
       >
         <span aria-hidden="true">🏬</span>
-        <span>{active?.name || 'Select shop'}</span>
+        <span>{active?.name || 'All locations'}</span>
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>▾</span>
       </button>
 
@@ -73,6 +73,30 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
             zIndex: 2000,
           }}
         >
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              if (activeLocationId) onChange("");
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              border: 'none',
+              textAlign: 'left',
+              padding: '8px 12px',
+              background: !activeLocationId ? 'var(--bg-accent)' : 'transparent',
+              color: !activeLocationId ? 'var(--text-accent)' : 'var(--text-primary)',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <span aria-hidden="true">{!activeLocationId ? '📍' : '🏬'}</span>
+            All locations
+          </button>
+          <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 0' }} />
           {locations.map((loc) => {
             const isActive = String(loc.id) === String(activeLocationId);
             return (

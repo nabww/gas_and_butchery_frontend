@@ -28,7 +28,7 @@ export default function Overrides() {
   const payoutRows = data?.pendingPayouts || [];
 
   return (
-    <main className="p-6 max-w-5xl mx-auto space-y-6">
+    <main className="p-3 sm:p-6 max-w-5xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-textPrimary">Overrides & approvals</h1>
       <p className="text-textSecondary text-sm">
         Credit-limit overrides and pending promotional payouts that need attention.

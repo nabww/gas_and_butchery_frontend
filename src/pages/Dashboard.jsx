@@ -13,6 +13,7 @@ import {
   getPromoPayouts,
   markPromoPayoutPaid,
   markPromoPayoutUnfulfilled,
+  getInventoryValue,
 } from "../lib/api";
 import PayoutActionModal from "../components/PayoutActionModal";
 
@@ -149,6 +150,7 @@ export default function Dashboard({ onNavigate }) {
   const [recentSales, setRecentSales] = useState([]);
   const [trend, setTrend] = useState([]);
   const [pendingRewards, setPendingRewards] = useState([]);
+  const [inventoryValue, setInventoryValue] = useState({ totalValue: 0 });
   const [selectedPayout, setSelectedPayout] = useState(null);
   const [payoutError, setPayoutError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -186,6 +188,7 @@ export default function Dashboard({ onNavigate }) {
           locationsData,
           trendData,
           pendingRewardsData,
+          inventoryValueData,
         ] = await Promise.all([
           getSalesReport(startDate, endDate, activeLocationId).catch(() => null),
           getSalesReport(priorPeriod.start, priorPeriod.end, activeLocationId).catch(() => null),
@@ -201,6 +204,7 @@ export default function Dashboard({ onNavigate }) {
           // few days ago is still owed to the customer today, so the owner
           // needs to see it here regardless of when it was won.
           getPromoPayouts(false, activeLocationId).catch(() => []),
+          getInventoryValue(activeLocationId).catch(() => ({ totalValue: 0 })),
         ]);
         if (cancelled) return;
         setSales(salesData);
@@ -215,6 +219,7 @@ export default function Dashboard({ onNavigate }) {
         setRecentSales((salesData?.sales || []).slice(0, 5));
         setTrend(trendData?.points || []);
         setPendingRewards(pendingRewardsData || []);
+        setInventoryValue(inventoryValueData || { totalValue: 0 });
       } catch (err) {
         setError(err.message || "Failed to load dashboard.");
       } finally {
@@ -253,6 +258,8 @@ export default function Dashboard({ onNavigate }) {
   };
 
   const revenue = sales?.summary?.totalRevenue || 0;
+  const cogs = sales?.summary?.totalCOGS || 0;
+  const grossProfit = sales?.summary?.totalGrossProfit || 0;
   const transactions = sales?.summary?.totalSales || 0;
   const cash = sales?.summary?.byMethod?.cash || 0;
   const mpesa = sales?.summary?.byMethod?.mpesa || 0;
@@ -326,14 +333,14 @@ export default function Dashboard({ onNavigate }) {
 
   if (loading) {
     return (
-      <main className="p-6 max-w-6xl mx-auto">
+      <main className="p-3 sm:p-6 max-w-6xl mx-auto">
         <p className="text-textSecondary">Loading dashboard…</p>
       </main>
     );
   }
 
   return (
-    <main className="p-6 max-w-6xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-6xl mx-auto">
       <header className="mb-6 space-y-4">
         <div>
           <h1 className="text-textPrimary text-2xl font-bold">Dashboard</h1>
@@ -387,6 +394,12 @@ export default function Dashboard({ onNavigate }) {
         <div className="mb-4 p-3 rounded-xl bg-danger/10 text-danger text-sm">{error}</div>
       )}
 
+      {!activeLocationId && (
+        <div className="mb-4 p-3 rounded-xl bg-warning/10 text-warning text-sm">
+          You are viewing data for <strong>all locations</strong>. This view is read-only — select a shop to record sales, expenses, or transfers.
+        </div>
+      )}
+
       {(narratives.length > 0 || trend.length > 0) && (
         <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
           <div className="flex justify-between items-center mb-3">
@@ -424,6 +437,31 @@ export default function Dashboard({ onNavigate }) {
           value={formatKes(totalIncome)}
           subtext="Collected income less recorded costs for this period"
           tone={totalIncome >= 0 ? "success" : "danger"}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard
+          label="COGS"
+          value={formatKes(cogs)}
+          subtext="Cost of gas/products sold in selected period"
+          tone="warning"
+        />
+        <KpiCard
+          label="Gross profit"
+          value={formatKes(grossProfit)}
+          subtext="Revenue less cost of goods sold"
+          tone={grossProfit >= 0 ? "success" : "danger"}
+        />
+        <KpiCard
+          label="Inventory value"
+          value={formatKes(inventoryValue?.totalValue)}
+          subtext="Current stock value at landed cost"
+        />
+        <KpiCard
+          label="Gross margin"
+          value={`${((sales?.summary?.grossProfitMargin || 0) * 100).toFixed(1)}%`}
+          subtext="Gross profit as a share of revenue"
         />
       </section>
 
@@ -548,7 +586,7 @@ export default function Dashboard({ onNavigate }) {
         </section>
       )}
 
-      {(pendingRewards.length > 0 || payoutError) && (
+      {activeLocationId && (pendingRewards.length > 0 || payoutError) && (
       <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-textPrimary font-bold">

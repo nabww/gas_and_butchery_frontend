@@ -1657,7 +1657,7 @@ export default function CorporateAccountsAdmin() {
   }, []);
 
   return (
-    <main className="p-6 max-w-4xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-textPrimary">
         Corporate Accounts
       </h1>

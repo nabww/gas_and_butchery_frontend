@@ -527,9 +527,15 @@ export default function Expenses() {
   );
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-textPrimary">Expenses</h1>
       <p className="text-textSecondary text-sm mt-1">Record and review business expenses.</p>
+
+      {!activeLocationId && (
+        <div className="mt-4 p-3 rounded-xl bg-warning/10 text-warning text-sm">
+          Select a specific shop above to record or view expenses. The all-locations view is read-only.
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button

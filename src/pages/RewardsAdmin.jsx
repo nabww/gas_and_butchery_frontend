@@ -163,7 +163,7 @@ export default function RewardsAdmin() {
     </form>
   );
   return (
-    <main className="p-6 max-w-4xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-textPrimary">Rewards Catalogue</h1>
       <p className="text-textSecondary text-sm mt-1">
         Manage prizes customers can redeem using loyalty points.

@@ -16,10 +16,13 @@ import {
   updateStockThreshold,
   getOversellFlags,
   resolveOversellFlag,
-  createGasRefill,
-  createGasPurchase,
+  listLocations,
+  listStockTransfers,
+  createStockTransfer,
 } from "../lib/api";
 import CylinderBrandForm from "../components/CylinderBrandForm";
+import GasRestockForm from "../components/GasRestockForm";
+import ProductRestockForm from "../components/ProductRestockForm";
 import { useActiveLocation } from "../contexts/LocationContext";
 
 const businessOptions = ["butchery", "accessory"];
@@ -347,8 +350,6 @@ function GasStockRow({
   isExpanded,
   onCancelEdit,
   activeLocationId,
-  onRefill,
-  onPurchase,
 }) {
   const [editing, setEditing] = useState(false);
   const [filledQty, setFilledQty] = useState(item.filled_qty);
@@ -499,16 +500,6 @@ function GasStockRow({
                   Edit
                 </button>
                 <button
-                  onClick={() => onRefill(item)}
-                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
-                  Refill
-                </button>
-                <button
-                  onClick={() => onPurchase(item)}
-                  className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
-                  Purchase filled
-                </button>
-                <button
                   onClick={() => setEditing(true)}
                   className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
                   Adjust stock
@@ -534,197 +525,6 @@ function GasStockRow({
         </tr>
       )}
     </>
-  );
-}
-
-function GasRefillModal({ item, activeLocationId, onClose, onSaved, mode = "refill" }) {
-  const isRefill = mode === "refill";
-  const [quantity, setQuantity] = useState("");
-  const [unitCost, setUnitCost] = useState("");
-  const [supplierName, setSupplierName] = useState("");
-  const [reference, setReference] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const qty = parseInt(quantity, 10);
-    const cost = parseFloat(unitCost);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      setError("Enter a valid quantity");
-      return;
-    }
-    if (isRefill && qty > item.empty_qty) {
-      setError(`Only ${item.empty_qty} empty cylinders available`);
-      return;
-    }
-    if (!Number.isFinite(cost) || cost < 0) {
-      setError("Enter a valid unit cost");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const payload = {
-        location_id: activeLocationId,
-        cylinder_brand_id: item.cylinder_brand_id,
-        quantity: qty,
-        unit_cost: cost,
-        supplier_name: supplierName.trim() || undefined,
-        reference: reference.trim() || undefined,
-        payment_method: paymentMethod,
-        expense_date: expenseDate,
-        notes: notes.trim() || undefined,
-      };
-      if (isRefill) {
-        await createGasRefill(payload);
-      } else {
-        await createGasPurchase(payload);
-      }
-      onSaved();
-    } catch (err) {
-      setError(err.message || `Failed to record ${isRefill ? "refill" : "purchase"}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface2 border border-borderColor p-6 shadow-lg space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-textPrimary">
-            {isRefill ? "Refill" : "Purchase filled"} {item.brand} {item.weight_kg}kg
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 rounded-lg border border-borderColor bg-surface1 text-textSecondary text-xs font-semibold hover:bg-surface3">
-            Close
-          </button>
-        </div>
-
-        <div className="p-3 rounded-xl bg-surface1 border border-borderColor">
-          <p className="text-textSecondary text-xs">
-            {isRefill ? "Empty cylinders available" : "Filled cylinders currently in stock"}
-          </p>
-          <p className="text-textPrimary text-xl font-bold">
-            {isRefill ? item.empty_qty : item.filled_qty}
-          </p>
-        </div>
-
-        {error && (
-          <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm font-medium">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-textMuted text-xs block mb-1">Quantity</label>
-            <input
-              type="number"
-              min="1"
-              max={isRefill ? item.empty_qty : undefined}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className={inputClass}
-              required
-            />
-          </div>
-          <div>
-            <label className="text-textMuted text-xs block mb-1">Unit cost</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={unitCost}
-              onChange={(e) => setUnitCost(e.target.value)}
-              className={inputClass}
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-textMuted text-xs block mb-1">Supplier</label>
-          <input
-            value={supplierName}
-            onChange={(e) => setSupplierName(e.target.value)}
-            className={inputClass}
-            placeholder="Supplier name"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-textMuted text-xs block mb-1">Reference</label>
-            <input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              className={inputClass}
-              placeholder="Invoice / receipt"
-            />
-          </div>
-          <div>
-            <label className="text-textMuted text-xs block mb-1">Payment method</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className={inputClass}>
-              <option value="cash">Cash</option>
-              <option value="mpesa">M-Pesa</option>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="cheque">Cheque</option>
-              <option value="credit">Credit</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-textMuted text-xs block mb-1">Expense date</label>
-          <input
-            type="date"
-            value={expenseDate}
-            onChange={(e) => setExpenseDate(e.target.value)}
-            className={inputClass}
-            required
-          />
-        </div>
-
-        <div>
-          <label className="text-textMuted text-xs block mb-1">Notes</label>
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className={inputClass}
-            placeholder="Optional notes"
-          />
-        </div>
-
-        <div className="flex gap-2 pt-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
-            {saving ? "Saving..." : `Record ${isRefill ? "refill" : "purchase"}`}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-borderColor bg-surface1 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
   );
 }
 
@@ -922,8 +722,6 @@ function GasStockTab({ staffRole }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [refillItem, setRefillItem] = useState(null);
-  const [purchaseItem, setPurchaseItem] = useState(null);
   const isAdmin = staffRole === "admin";
 
   const loadStock = useCallback(async () => {
@@ -986,33 +784,6 @@ function GasStockTab({ staffRole }) {
         <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-success text-sm font-medium">
           {toast}
         </div>
-      )}
-
-      {refillItem && (
-        <GasRefillModal
-          item={refillItem}
-          activeLocationId={activeLocationId}
-          onClose={() => setRefillItem(null)}
-          onSaved={() => {
-            setRefillItem(null);
-            loadStock();
-            showToast("Refill recorded.");
-          }}
-        />
-      )}
-
-      {purchaseItem && (
-        <GasRefillModal
-          mode="purchase"
-          item={purchaseItem}
-          activeLocationId={activeLocationId}
-          onClose={() => setPurchaseItem(null)}
-          onSaved={() => {
-            setPurchaseItem(null);
-            loadStock();
-            showToast("Purchase recorded.");
-          }}
-        />
       )}
 
       {isAdmin && !showForm && (
@@ -1117,8 +888,6 @@ function GasStockTab({ staffRole }) {
                     setExpandedId(null);
                     setEditing(null);
                   }}
-                  onRefill={setRefillItem}
-                  onPurchase={setPurchaseItem}
                 />
               ))
             )}
@@ -1244,9 +1013,276 @@ function GasStockTab({ staffRole }) {
   );
 }
 
-export default function CatalogStockAdmin({ staffRole }) {
+function RestockTab() {
+  const { activeLocationId } = useActiveLocation();
+  const [mode, setMode] = useState("cylinders");
+  const [stock, setStock] = useState([]);
+  const [accessories, setAccessories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadStock = useCallback(async () => {
+    if (!activeLocationId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const [cylinderData, productData] = await Promise.all([
+        getCylinderStockAdmin(activeLocationId),
+        getProducts("accessory", false, activeLocationId),
+      ]);
+      setStock(cylinderData || []);
+      setAccessories((productData || []).filter((p) => p.track_stock));
+    } catch (err) {
+      setError(err.message || "Failed to load stock");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeLocationId]);
+
+  useEffect(() => {
+    loadStock();
+  }, [loadStock]);
+
+  if (!activeLocationId) {
+    return (
+      <div className="p-3">
+        <p className="text-warning text-sm">Select a specific shop above to record a restock.</p>
+      </div>
+    );
+  }
+
+  const toggleClass = (active) =>
+    `px-3 py-1.5 rounded-lg text-sm font-semibold border ${active
+      ? "bg-primary text-onPrimary border-primary"
+      : "bg-surface1 text-textSecondary border-borderColor hover:bg-surface3 hover:text-textPrimary"}`;
+
   return (
-    <main className="p-6 max-w-6xl mx-auto">
+    <div className="p-3 space-y-4 max-w-4xl">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setMode("cylinders")} className={toggleClass(mode === "cylinders")}>
+          Gas cylinders
+        </button>
+        <button type="button" onClick={() => setMode("accessories")} className={toggleClass(mode === "accessories")}>
+          Gas accessories
+        </button>
+      </div>
+      {loading && <p className="text-textMuted text-sm">Loading stock…</p>}
+      {error && (
+        <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-sm font-medium">
+          {error}
+        </div>
+      )}
+      {mode === "cylinders" ? (
+        <GasRestockForm locationId={activeLocationId} stock={stock} onSuccess={loadStock} />
+      ) : accessories.length === 0 && !loading ? (
+        <p className="text-textMuted text-sm">
+          No stock-tracked accessory products yet. Add one under the Catalog tab with "Track stock" enabled.
+        </p>
+      ) : (
+        <ProductRestockForm locationId={activeLocationId} products={accessories} onSuccess={loadStock} />
+      )}
+    </div>
+  );
+}
+
+function StockTransfersTab({ staffRole }) {
+  const { activeLocationId } = useActiveLocation();
+  const [locations, setLocations] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [cylinders, setCylinders] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [destinationId, setDestinationId] = useState("");
+  const emptyLine = { item_type: "product", item_id: "", quantity: "" };
+  const [lines, setLines] = useState([emptyLine]);
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const canTransfer = staffRole === "admin" || staffRole === "supervisor";
+  const sourceLocation = locations.find((location) => String(location.id) === String(activeLocationId));
+  const destinations = locations.filter((location) =>
+    location.is_active && String(location.id) !== String(activeLocationId) &&
+    (sourceLocation?.is_stock_store || location.is_stock_store),
+  );
+  const trackedProducts = products.filter((product) => product.track_stock);
+  const itemsFor = (type) => (type === "product" ? trackedProducts : cylinders);
+  const availableFor = (line) => {
+    if (line.item_type === "product") return Number(trackedProducts.find((p) => String(p.id) === String(line.item_id))?.qty_on_hand || 0);
+    const cyl = cylinders.find((c) => String(c.cylinder_brand_id) === String(line.item_id));
+    return Number((line.item_type === "cylinder_filled" ? cyl?.filled_qty : cyl?.empty_qty) || 0);
+  };
+  const updateLine = (index, patch) => setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  const removeLine = (index) => setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  const validateLines = () => {
+    const seen = new Set();
+    for (const [i, line] of lines.entries()) {
+      const qty = Number(line.quantity);
+      if (!line.item_id) return `Select an item on line ${i + 1}`;
+      if (!Number.isInteger(qty) || qty <= 0) return `Quantity on line ${i + 1} must be a positive whole number`;
+      if (qty > availableFor(line)) return `Line ${i + 1}: only ${availableFor(line)} available`;
+      const key = `${line.item_type}:${line.item_id}`;
+      if (seen.has(key)) return `Line ${i + 1} duplicates an earlier line`;
+      seen.add(key);
+    }
+    return "";
+  };
+  const lineError = validateLines();
+
+  const load = useCallback(async () => {
+    if (!activeLocationId) return;
+    setLoading(true);
+    try {
+      const [locationRows, productRows, cylinderRows, transferRows] = await Promise.all([
+        listLocations(),
+        getProducts(null, false, activeLocationId),
+        getCylinderStockAdmin(activeLocationId),
+        listStockTransfers(activeLocationId),
+      ]);
+      setLocations(locationRows || []);
+      setProducts(productRows || []);
+      setCylinders(cylinderRows || []);
+      setTransfers(transferRows || []);
+    } catch (err) {
+      setMessage(err.message || "Failed to load stock transfers");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeLocationId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (saving || !destinationId) return;
+    const problem = validateLines();
+    if (problem) { setMessage(problem); return; }
+    setSaving(true);
+    setMessage("");
+    try {
+      await createStockTransfer({
+        source_location_id: Number(activeLocationId),
+        destination_location_id: Number(destinationId),
+        notes,
+        lines: lines.map((line) => (line.item_type === "product"
+          ? { item_type: "product", product_id: Number(line.item_id), quantity: Number(line.quantity) }
+          : { item_type: line.item_type, cylinder_brand_id: Number(line.item_id), quantity: Number(line.quantity) })),
+      });
+      setLines([emptyLine]);
+      setNotes("");
+      setMessage(`Transferred ${lines.length} line${lines.length === 1 ? "" : "s"} successfully.`);
+      await load();
+    } catch (err) {
+      setMessage(err.message || "Failed to transfer stock");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!canTransfer) return <p className="text-danger text-sm">Only admins and supervisors can transfer stock.</p>;
+  if (loading) return <p className="text-textSecondary text-sm">Loading transfers…</p>;
+
+  return (
+    <div className="space-y-5">
+      <form onSubmit={submit} className="rounded-xl border border-borderColor bg-surface2 p-4 space-y-4">
+        <div>
+          <h2 className="text-textPrimary font-bold">Transfer stock</h2>
+          <p className="text-textMuted text-xs mt-1">Transfers are online-only, atomic, and recorded at both locations.</p>
+        </div>
+        {message && <p className="text-sm text-warning">{message}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="text-xs text-textSecondary">From
+            <input className={`${inputClass} mt-1`} value={sourceLocation?.name || "Selected shop"} disabled />
+          </label>
+          <label className="text-xs text-textSecondary">To
+            <select className={`${inputClass} mt-1`} value={destinationId} onChange={(event) => setDestinationId(event.target.value)} required disabled={saving}>
+              <option value="">Select destination</option>
+              {destinations.map((location) => <option key={location.id} value={location.id}>{location.name}{location.is_stock_store ? " (Store)" : ""}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-textMuted text-xs">Transfer lines</label>
+          {lines.map((line, index) => {
+            const items = itemsFor(line.item_type);
+            const available = line.item_id ? availableFor(line) : null;
+            return (
+              <div key={index} className="p-3 rounded-xl bg-surface1 border border-borderColor space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr,2fr,auto] gap-3">
+                  <label className="text-xs text-textSecondary">Stock type
+                    <select className={`${inputClass} mt-1`} value={line.item_type} onChange={(event) => updateLine(index, { item_type: event.target.value, item_id: "" })} disabled={saving}>
+                      <option value="product">Tracked product</option>
+                      <option value="cylinder_filled">Filled cylinder</option>
+                      <option value="cylinder_empty">Empty cylinder</option>
+                    </select>
+                  </label>
+                  <label className="text-xs text-textSecondary">Item
+                    <select className={`${inputClass} mt-1`} value={line.item_id} onChange={(event) => updateLine(index, { item_id: event.target.value })} required disabled={saving}>
+                      <option value="">Select item</option>
+                      {items.map((item) => (
+                        <option key={line.item_type === "product" ? item.id : item.cylinder_brand_id} value={line.item_type === "product" ? item.id : item.cylinder_brand_id}>
+                          {line.item_type === "product" ? `${item.name} (${Number(item.qty_on_hand || 0)} available)` : `${item.brand} ${item.weight_kg}kg (${Number(line.item_type === "cylinder_filled" ? item.filled_qty : item.empty_qty)} available)`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs text-textSecondary">Quantity
+                    <input className={`${inputClass} mt-1 sm:w-28`} type="number" min="1" step="1" max={available ?? undefined} value={line.quantity} onChange={(event) => updateLine(index, { quantity: event.target.value })} required disabled={saving} />
+                  </label>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {available !== null && <span className="text-textSecondary text-xs mr-auto">{available} available at {sourceLocation?.name || "this shop"}</span>}
+                  {lines.length > 1 && (
+                    <button type="button" onClick={() => removeLine(index)} disabled={saving} className="px-2 py-1 rounded-lg border border-danger/30 text-danger text-xs font-semibold hover:bg-danger/10">Remove line</button>
+                  )}
+                  {index === lines.length - 1 && (
+                    <button type="button" onClick={() => setLines((prev) => [...prev, emptyLine])} disabled={saving} className="px-2 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3">+ Add line</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <label className="text-xs text-textSecondary block">Notes
+          <input className={`${inputClass} mt-1`} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} disabled={saving} />
+        </label>
+        {destinations.length === 0 && <p className="text-warning text-xs">Mark this shop or another active shop as a Stock store under Settings → Shops before transferring.</p>}
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={saving || destinations.length === 0 || !destinationId || Boolean(lineError)} className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
+            {saving ? "Transferring…" : `Transfer ${lines.length} line${lines.length === 1 ? "" : "s"}`}
+          </button>
+          {lineError && lines.some((l) => l.item_id && l.quantity) && <span className="text-xs text-warning">{lineError}</span>}
+        </div>
+      </form>
+
+      <div className="rounded-xl border border-borderColor overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-surface2 text-textSecondary"><tr><th className="p-3 text-left">Date</th><th className="p-3 text-left">From</th><th className="p-3 text-left">To</th><th className="p-3 text-left">Staff</th><th className="p-3 text-right">Lines</th></tr></thead>
+          <tbody>
+            {transfers.length === 0 ? <tr><td colSpan={5} className="p-4 text-center text-textMuted">No transfers involving this shop.</td></tr> : transfers.map((transfer) => (
+              <tr key={transfer.id} className="border-t border-borderColor text-textPrimary">
+                <td className="p-3 whitespace-nowrap">{new Date(transfer.created_at).toLocaleString("en-KE")}</td>
+                <td className="p-3">{transfer.source_location_name}</td>
+                <td className="p-3">{transfer.destination_location_name}</td>
+                <td className="p-3">{transfer.staff_name}</td>
+                <td className="p-3 text-right">{transfer.line_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default function CatalogStockAdmin({ staffRole }) {
+  const { activeLocationId, locations } = useActiveLocation();
+  const activeLocation = locations.find((location) => String(location.id) === String(activeLocationId));
+  const canTransfer = (staffRole === "admin" || staffRole === "supervisor") && Boolean(activeLocation?.is_stock_store);
+
+  return (
+    <main className="p-3 sm:p-6 max-w-6xl mx-auto">
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-textPrimary">
           Catalog &amp; Stock
@@ -1260,6 +1296,8 @@ export default function CatalogStockAdmin({ staffRole }) {
         <CTabList variant="tabs">
           <CTab itemKey="catalog">Catalog</CTab>
           <CTab itemKey="gas">Gas Stock</CTab>
+          {staffRole === "admin" && <CTab itemKey="restock">Restock</CTab>}
+          {canTransfer && <CTab itemKey="transfers">Transfers</CTab>}
         </CTabList>
         <CTabContent>
           <CTabPanel className="p-3" itemKey="catalog">
@@ -1268,6 +1306,16 @@ export default function CatalogStockAdmin({ staffRole }) {
           <CTabPanel className="p-3" itemKey="gas">
             <GasStockTab staffRole={staffRole} />
           </CTabPanel>
+          {staffRole === "admin" && (
+            <CTabPanel className="p-3" itemKey="restock">
+              <RestockTab />
+            </CTabPanel>
+          )}
+          {canTransfer && (
+            <CTabPanel className="p-3" itemKey="transfers">
+              <StockTransfersTab staffRole={staffRole} />
+            </CTabPanel>
+          )}
         </CTabContent>
       </CTabs>
     </main>

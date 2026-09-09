@@ -1,5 +1,5 @@
-/* TeziPOS design tokens. Dark is default (see build plan Section 5a);
-   [data-theme="light"] on <html> or <body> overrides these. */
+/* TeziPOS design tokens. Light is the initial user preference;
+   [data-theme="light"] on <html> or <body> applies its overrides. */
 
 :root,
 [data-theme='dark'] {
@@ -38,6 +38,7 @@
   --status-error: #ef4444;
   --status-warning: #f97316;
   --status-success: #22c55e;
+  --fill-success: #22c55e;
   --status-info: #3b82f6;
 
   --fill-primary: #7c3aed;
@@ -92,6 +93,7 @@
   --status-error: #ef4444;
   --status-warning: #f97316;
   --status-success: #22c55e;
+  --fill-success: #22c55e;
   --status-info: #3b82f6;
 
   --fill-primary: #7c3aed;

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   loadCurrentSale,
   resetCurrentSale,
+  discardCurrentDraft,
   getPendingSaleSnapshot,
 } from "../lib/db/syncQueue";
 import { getStoredStaff, checkBackendReachable } from "../lib/api";
@@ -9,7 +10,7 @@ import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
 import { setOfflineSalesEnabled } from "../lib/settings";
 import ProductCatalog from "../components/ProductCatalog";
-import CategoryPills from "../components/CategoryPills";
+import { IconArrowLeft, IconBuildingStore, IconGasStation, IconShoppingCart } from "@tabler/icons-react";
 import Cart from "../components/Cart";
 import CustomerSelector from "../components/CustomerSelector";
 import Payment from "../components/Payment";
@@ -45,6 +46,7 @@ function useBackendOnlineStatus() {
 }
 
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
+let cartClearedForPageLoad = false;
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount || 0).toLocaleString("en-KE", {
@@ -66,6 +68,17 @@ export default function Till({ staff, onNavigate }) {
   }, [isOnline]);
 
   const { activeLocationId, locations } = useActiveLocation();
+
+  if (!activeLocationId) {
+    return (
+      <main className="p-6 max-w-4xl mx-auto">
+        <h1 className="text-textPrimary text-2xl font-bold">Till</h1>
+        <p className="text-textSecondary text-sm mt-2">
+          Select a specific shop above to make sales. The all-locations view is read-only.
+        </p>
+      </main>
+    );
+  }
   // A supervisor/admin who has switched shops via the nav sees that shop's
   // catalog and stock here too — useful for admins checking stock or
   // covering a rush at another branch. Cashiers (and anyone without switch
@@ -124,6 +137,7 @@ export default function Till({ staff, onNavigate }) {
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [pendingConsentCustomer, setPendingConsentCustomer] = useState(null);
   const isInitializing = useRef(false);
+  const hasInitialized = useRef(false);
   // On narrow screens the catalog and cart can't both fit on screen at
   // once without squashing the cart into an unusable sliver -- show one
   // full-height pane at a time instead (desktop/tablet still shows both
@@ -162,6 +176,14 @@ export default function Till({ staff, onNavigate }) {
     setError("");
     try {
       const currentStaff = staff || getStoredStaff();
+      if (!hasInitialized.current) {
+        hasInitialized.current = true;
+        if (!cartClearedForPageLoad) {
+          cartClearedForPageLoad = true;
+          resetCart();
+          await discardCurrentDraft();
+        }
+      }
       const sale = await loadCurrentSale(currentStaff, saleLocationOverride);
       setSaleId(sale.server_id || sale.local_id);
       setSaleLocalId(sale.local_id);
@@ -192,15 +214,25 @@ export default function Till({ staff, onNavigate }) {
   };
 
   const handleStartNewSale = async () => {
+    if (isInitializing.current) return;
+    isInitializing.current = true;
     const currentStaff = staff || getStoredStaff();
-    try {
-      await resetCurrentSale(currentStaff, saleLocationOverride);
-    } catch (err) {
-      setError(err.message);
-    }
     resetCart();
     setMobileTab("catalog");
-    await initializeNewSale();
+    setLoading(true);
+    setError("");
+    try {
+      const sale = await resetCurrentSale(currentStaff, saleLocationOverride);
+      setSaleId(sale.local_id);
+      setSaleLocalId(sale.local_id);
+      setItems([]);
+      setDiscountAmount(0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      isInitializing.current = false;
+      setLoading(false);
+    }
   };
 
   const handleRegisterPendingCustomer = () => {
@@ -215,20 +247,29 @@ export default function Till({ staff, onNavigate }) {
       <div className="till-header">
         <h1>Sales Till</h1>
         {allowedBusinesses.length > 1 && (
-          <div className="till-header-pills">
-            <CategoryPills
-              categories={allowedBusinesses}
-              active={businessType}
-              onSelect={setBusinessType}
-              labels={businessLabels}
-            />
+          <div className="till-business-segments" role="tablist" aria-label="Business type">
+            {allowedBusinesses.map((type) => {
+              const active = type === businessType;
+              const Icon = type === "gas" ? IconGasStation : IconBuildingStore;
+              const label = businessLabels[type] || (type === "gas" ? "Gas" : "Retail");
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setBusinessType(type)}
+                  className={active ? "active" : ""}>
+                  <Icon size={16} stroke={1.75} aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
         )}
-        <div className="flex items-center gap-4 text-textSecondary text-sm">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-success" : "bg-warning"}`}
-            aria-label={isOnline ? "System online" : "Working offline"}
-            title={isOnline ? "System online" : "Working offline"}></span>
+        <div className="till-status-pill" aria-label={isOnline ? "System online" : "Working offline"}>
+          <span className={`till-status-dot ${isOnline ? "online" : "offline"}`} aria-hidden="true" />
+          <span className="till-status-text">{isOnline ? "Online" : "Offline"}</span>
         </div>
       </div>
 
@@ -284,6 +325,7 @@ export default function Till({ staff, onNavigate }) {
                 refreshSignal={catalogRefreshKey}
                 locationId={catalogLocationId}
                 businessLabels={businessLabels}
+                hideCategoryPills
               />
             </div>
 
@@ -323,18 +365,22 @@ export default function Till({ staff, onNavigate }) {
               cost a whole row of chrome or read as a banner. */}
           <button
             type="button"
-            className="till-bottom-bar"
+            className={`till-bottom-bar ${mobileTab === "catalog" ? "show-cart" : "show-catalog"}`}
+            aria-label={mobileTab === "catalog" ? "Open cart" : "Back to catalog"}
             onClick={() => setMobileTab(mobileTab === "catalog" ? "cart" : "catalog")}>
             {mobileTab === "catalog" ? (
               <>
-                <span aria-hidden="true">🛒</span>
+                <IconShoppingCart size={18} stroke={2} aria-hidden="true" />
                 {items.length > 0 && (
                   <span className="till-bottom-bar-badge">{items.length}</span>
                 )}
                 {items.length > 0 && <span>{formatKes(total)}</span>}
               </>
             ) : (
-              <span>← Catalog</span>
+              <>
+                <IconArrowLeft size={18} stroke={2} aria-hidden="true" />
+                <span>Back to catalog</span>
+              </>
             )}
           </button>
         </>

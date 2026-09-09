@@ -94,14 +94,14 @@ export default function Insights({ onNavigate }) {
 
   if (loading) {
     return (
-      <main className="p-6 max-w-6xl mx-auto">
+      <main className="p-3 sm:p-6 max-w-6xl mx-auto">
         <p className="text-textSecondary">Loading insights…</p>
       </main>
     );
   }
 
   return (
-    <main className="p-6 max-w-6xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-6xl mx-auto">
       <header className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           {onNavigate && (

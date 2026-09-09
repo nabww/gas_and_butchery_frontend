@@ -121,14 +121,14 @@ function RetailProductCard({ product, onToast }) {
   };
 
   return (
-    <div className="group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
+    <div className="group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-3 sm:p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
       {icon && (
-        <div className="flex items-center justify-center h-28 rounded-xl bg-surface1 border border-borderColor mb-4 text-5xl">
+        <div className="flex items-center justify-center h-20 sm:h-28 rounded-xl bg-surface1 border border-borderColor mb-3 sm:mb-4 text-4xl sm:text-5xl">
           {icon}
         </div>
       )}
 
-      <div className="mb-3 min-w-0">
+      <div className="mb-2 sm:mb-3 min-w-0">
         <h3 className="text-textPrimary font-bold text-base truncate">
           {product.name}
         </h3>
@@ -145,7 +145,7 @@ function RetailProductCard({ product, onToast }) {
         </p>
       </div>
 
-      <div className="flex items-center justify-between mb-3 mt-auto">
+      <div className="flex items-center justify-between mb-2 sm:mb-3 mt-auto">
         <span className="text-textSecondary text-sm font-medium">Qty</span>
         <QuantityStepper
           value={quantity}
@@ -157,7 +157,7 @@ function RetailProductCard({ product, onToast }) {
       </div>
 
       {isWeighted && (
-        <div className="flex items-center justify-between mb-4 gap-3">
+        <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3">
           <span className="text-textSecondary text-sm font-medium">Amount</span>
           <input
             type="number"

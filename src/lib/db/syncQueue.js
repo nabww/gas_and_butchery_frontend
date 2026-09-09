@@ -76,15 +76,23 @@ export async function loadCurrentSale(staff, locationOverride) {
   return createLocalSale(staff, locationOverride);
 }
 
+export async function discardCurrentDraft() {
+  const currentId = localStorage.getItem("tezipos-current-sale-id");
+  if (!currentId) return;
+  const sale = await getById("sales", currentId);
+  if (sale && sale.status !== "completed") {
+    await discardLocalSale(currentId);
+    return;
+  }
+  localStorage.removeItem("tezipos-current-sale-id");
+}
+
 export async function resetCurrentSale(staff, locationOverride) {
   const currentId = localStorage.getItem("tezipos-current-sale-id");
   if (currentId) {
     const sale = await getById("sales", currentId);
-    if (sale) {
-      sale.status = "completed";
-      sale.sync_status = sale.server_id ? "synced" : "pending";
-      await putRecord("sales", sale);
-    }
+    if (sale && sale.status !== "completed") await discardLocalSale(currentId);
+    else localStorage.removeItem("tezipos-current-sale-id");
   }
   return createLocalSale(staff, locationOverride);
 }

@@ -630,7 +630,7 @@ function ShopsSettingsSection({ setMessage }) {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ name: "", address: "", is_active: true, business_types: [] });
+  const [form, setForm] = useState({ name: "", address: "", is_active: true, is_stock_store: false, business_types: [] });
   const [saving, setSaving] = useState(false);
   const [mpesaForm, setMpesaForm] = useState({
     environment: "sandbox",
@@ -660,7 +660,7 @@ function ShopsSettingsSection({ setMessage }) {
 
   const startAdd = () => {
     setEditingId("new");
-    setForm({ name: "", address: "", is_active: true, business_types: [], business_type_labels: {} });
+    setForm({ name: "", address: "", is_active: true, is_stock_store: false, business_types: [], business_type_labels: {} });
   };
 
   const startEdit = (loc) => {
@@ -669,6 +669,7 @@ function ShopsSettingsSection({ setMessage }) {
       name: loc.name || "",
       address: loc.address || "",
       is_active: !!loc.is_active,
+      is_stock_store: !!loc.is_stock_store,
       business_types: loc.business_types || [],
       business_type_labels: loc.business_type_labels || {},
     });
@@ -676,7 +677,7 @@ function ShopsSettingsSection({ setMessage }) {
 
   const cancel = () => {
     setEditingId(null);
-    setForm({ name: "", address: "", is_active: true, business_types: [], business_type_labels: {} });
+    setForm({ name: "", address: "", is_active: true, is_stock_store: false, business_types: [], business_type_labels: {} });
   };
 
   const toggleBusinessType = (type) => {
@@ -828,15 +829,27 @@ function ShopsSettingsSection({ setMessage }) {
               disabled={!isAdmin || saving}
             />
           </div>
-          <label className="flex items-center gap-2 text-textPrimary text-sm">
-            <input
-              type="checkbox"
-              checked={form.is_active}
-              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-              disabled={!isAdmin || saving}
-            />
-            Active
-          </label>
+          <div className="flex flex-wrap gap-5">
+            <label className="flex items-center gap-2 text-textPrimary text-sm">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                disabled={!isAdmin || saving}
+              />
+              Active
+            </label>
+            <label className="flex items-center gap-2 text-textPrimary text-sm">
+              <input
+                type="checkbox"
+                checked={form.is_stock_store}
+                onChange={(e) => setForm({ ...form, is_stock_store: e.target.checked })}
+                disabled={!isAdmin || saving}
+              />
+              Stock store
+            </label>
+          </div>
+          <p className="text-textMuted text-xs -mt-2">Stock stores can issue inventory to other active shops and receive returns.</p>
           <div>
             <label className={label}>Businesses run at this shop</label>
             <p className="text-textMuted text-xs mt-1 mb-2">
@@ -927,7 +940,12 @@ function ShopsSettingsSection({ setMessage }) {
                 locations.map((loc) => (
                   <Fragment key={loc.id}>
                     <tr className="border-t border-borderColor text-textPrimary">
-                      <td className="p-3 font-semibold">{loc.name}</td>
+                      <td className="p-3 font-semibold">
+                        {loc.name}
+                        {Boolean(loc.is_stock_store) && (
+                          <span className="ml-2 inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-primary/10 text-primary">Store</span>
+                        )}
+                      </td>
                       <td className="p-3 text-textSecondary">{loc.address || "No address"}</td>
                       <td className="p-3">
                         <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-surface2 text-textSecondary capitalize">
@@ -1069,7 +1087,7 @@ export default function Settings() {
   const [message, setMessage] = useState("");
 
   return (
-    <main className="p-6 max-w-3xl mx-auto">
+    <main className="p-3 sm:p-6 max-w-3xl mx-auto">
       <header className="mb-6">
         <h1 className="text-textPrimary text-2xl font-bold">Settings</h1>
         <p className="text-textSecondary text-sm mt-1">

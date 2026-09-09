@@ -30,11 +30,10 @@ export function LocationProvider({ children, staff }) {
               setActiveLocationId(own);
               localStorage.setItem("activeLocationId", own);
             }
-          } else if (!activeLocationId && data?.length && staff?.locationId) {
-            const fallback = String(staff.locationId);
-            setActiveLocationId(fallback);
-            localStorage.setItem("activeLocationId", fallback);
           }
+          // Staff who can switch locations are allowed to use an empty
+          // activeLocationId as the "All locations" read-only view. Don't
+          // overwrite it with a default shop on every reload.
         }
       })
       .catch((err) => console.warn("Failed to load locations", err));
