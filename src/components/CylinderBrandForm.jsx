@@ -147,11 +147,11 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       return;
     }
     if (!Number.isFinite(refill) || refill < 0) {
-      setError('Refill price must be valid');
+      setError('Customer refill price must be valid');
       return;
     }
     if (!Number.isFinite(cylinder) || cylinder < 0) {
-      setError('Cylinder value must be valid');
+      setError('Complete cylinder price must be valid');
       return;
     }
 
@@ -331,7 +331,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           </div>
           <div>
             <label className='text-textMuted text-xs block mb-1'>
-              Refill price
+              Customer refill price (sell)
             </label>
             <input
               className={inputClass}
@@ -344,7 +344,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           </div>
           <div>
             <label className='text-textMuted text-xs block mb-1'>
-              Cylinder value
+              Complete cylinder price (sell)
             </label>
             <input
               className={inputClass}
@@ -405,7 +405,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           {previewAddedFilled > 0 && (
             <div>
               <label className='text-textMuted text-xs block mb-1'>
-                Cost per added filled cylinder (KES)
+                Purchase cost per filled cylinder (KES)
               </label>
               <input
                 className={inputClass}
@@ -421,7 +421,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
           {previewAddedEmpty > 0 && (
             <div>
               <label className='text-textMuted text-xs block mb-1'>
-                Cost per added empty (KES)
+                Purchase cost per empty shell (KES)
               </label>
               <input
                 className={inputClass}
@@ -455,9 +455,9 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       {showTakeFields && (
         <p className='text-textMuted text-xs'>
           Quantities added above the current count are recorded as an
-          opening-stock expense — filled cylinders at the cost entered, empty
-          shells at the cylinder value unless overridden. Reducing a count is
-          a correction — no expense.
+          opening-stock expense — filled cylinders at the purchase cost
+          entered, empty shells at the complete cylinder price unless
+          overridden. Reducing a count is a correction — no expense.
         </p>
       )}
 
