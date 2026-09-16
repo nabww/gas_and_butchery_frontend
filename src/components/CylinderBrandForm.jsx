@@ -82,6 +82,8 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       setEmptyQty(editing.empty_qty ?? '0');
       setLowStockThreshold(editing.low_stock_threshold ?? '3');
       setIsActive(Boolean(editing.is_active));
+      setFilledCost(String(editing.refill_price ?? ''));
+      setEmptyCost('');
     }
   }, [editing]);
 
@@ -111,6 +113,10 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
         setEmptyQty(String(selected.empty_qty ?? '0'));
         setLowStockThreshold(String(selected.low_stock_threshold ?? '3'));
         setIsActive(Boolean(selected.is_active));
+        // Prefill the added-stock cost with the refill price — usually close
+        // enough to just confirm, still editable when the depot cost differs.
+        setFilledCost(String(selected.refill_price ?? ''));
+        setEmptyCost('');
       }
     } else {
       setSelectedBrandId('');
@@ -149,9 +155,6 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       return;
     }
 
-    setSaving(true);
-    setError('');
-
     // Quantities being ADDED post an opening-stock expense at the cost entered
     // (empty shells default to the brand's cylinder value); reductions are
     // plain count corrections, not expenses. Added stock always has a cost —
@@ -167,6 +170,9 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       setError('Enter what each added filled cylinder cost — added stock is an expense');
       return;
     }
+
+    setSaving(true);
+    setError('');
 
     const buildTakeLines = (brandId) => {
       const lines = [];
@@ -408,7 +414,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
                 step='0.01'
                 value={filledCost}
                 onChange={(e) => setFilledCost(e.target.value)}
-                placeholder='Required — what you paid per cylinder'
+                placeholder='Defaults to refill price — edit if you paid differently'
               />
             </div>
           )}
