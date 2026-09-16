@@ -168,8 +168,8 @@ export default function App() {
           <Till staff={staff} onNavigate={setPath} />
         ) : currentPath === "/customers" ? (
           <CustomersAdmin staffRole={staff.role} />
-        ) : currentPath === "/catalog" || currentPath === "/stock" ? (
-          <CatalogStockAdmin staffRole={staff.role} />
+        ) : currentPath === "/stock" || currentPath?.startsWith("/catalog") ? (
+          <CatalogStockAdmin staffRole={staff.role} initialTab={new URLSearchParams(currentPath.split("?")[1] || "").get("tab") || undefined} />
         ) : currentPath === "/expenses" ? (
           <Expenses />
         ) : currentPath === "/settings" ? (

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTheme } from '../lib/useTheme';
 import { useActiveLocation } from '../contexts/LocationContext';
 import { MODULE_CATALOG, effectiveModules } from '../lib/modules';
-import { getBusinessConfig } from '../lib/api';
+import { getBusinessConfig, listRefillRequests } from '../lib/api';
 
 function HamburgerIcon({ open }) {
   return (
@@ -132,12 +132,13 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
   );
 }
 
-function NavItem({ item, currentPath, onClick, mobile }) {
-  const active = currentPath === item.path;
+function NavItem({ item, currentPath, onClick, onBadgeClick, mobile, badge }) {
+  const active = currentPath === item.path || currentPath?.startsWith(`${item.path}?`);
   return (
     <button
       onClick={onClick}
       style={{
+        position: 'relative',
         border: 'none',
         background: active ? 'var(--bg-accent)' : 'transparent',
         color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
@@ -149,6 +150,32 @@ function NavItem({ item, currentPath, onClick, mobile }) {
       }}
     >
       {item.label}
+      {badge > 0 && (
+        <span
+          role="button"
+          title={`${badge} refill request${badge === 1 ? '' : 's'} waiting`}
+          onClick={(e) => { e.stopPropagation(); onBadgeClick?.(); }}
+          style={{
+            position: mobile ? 'relative' : 'absolute',
+            top: mobile ? undefined : -4,
+            right: mobile ? undefined : -4,
+            marginLeft: mobile ? 6 : 0,
+            minWidth: 16,
+            height: 16,
+            padding: '0 4px',
+            borderRadius: 999,
+            background: 'var(--danger, #e55353)',
+            color: '#fff',
+            fontSize: 10,
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -172,6 +199,14 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [businessConfig, setBusinessConfig] = useState(null);
+  // Refill requests are directional: the stock store sees a badge for requests
+  // waiting on them; the requesting shop sees a green banner once fulfilled
+  // (recent — fulfilled within the last 7 days).
+  const [refillWaiting, setRefillWaiting] = useState(0);
+  const [refillFulfilled, setRefillFulfilled] = useState(0);
+  // Dismissed-count: closing the green banner hides it until another
+  // request is fulfilled (count rises above what was dismissed).
+  const [dismissedFulfilled, setDismissedFulfilled] = useState(0);
   const topBarRef = useRef(null);
   const navRef = useRef(null);
   const collapsedAt = useRef(0);
@@ -181,6 +216,41 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
       .then(setBusinessConfig)
       .catch((err) => console.warn('Failed to load business config for nav', err));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const canAct = staff.role === 'admin' || staff.role === 'supervisor';
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const load = async () => {
+      if (!navigator.onLine) return;
+      try {
+        const rows = await listRefillRequests(activeLocationId || undefined);
+        if (cancelled) return;
+        const waiting = canAct
+          ? (rows || []).filter((r) =>
+              (r.status === 'pending' || r.status === 'in_progress') &&
+              (!activeLocationId || Number(r.stock_store_location_id) === Number(activeLocationId)),
+            ).length
+          : 0;
+        const fulfilled = activeLocationId
+          ? (rows || []).filter((r) =>
+              r.status === 'fulfilled' &&
+              Number(r.requesting_location_id) === Number(activeLocationId) &&
+              new Date(r.fulfilled_at).getTime() > weekAgo,
+            ).length
+          : 0;
+        setRefillWaiting(waiting);
+        setRefillFulfilled(fulfilled);
+      } catch {
+        if (!cancelled) { setRefillWaiting(0); setRefillFulfilled(0); }
+      }
+    };
+    load();
+    const timer = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [staff.role, activeLocationId]);
+
+  useEffect(() => { setDismissedFulfilled(0); }, [activeLocationId]);
 
   const handleNav = (path) => {
     setMobileOpen(false);
@@ -297,7 +367,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               item={item}
               currentPath={currentPath}
               onClick={() => handleNav(item.path)}
+              onBadgeClick={() => handleNav('/catalog?tab=refill-requests')}
               mobile={false}
+              badge={item.path === '/catalog' ? refillWaiting : 0}
             />
           ))}
 
@@ -367,6 +439,66 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         </button>
       </div>
 
+      {/* Requesting-shop confirmation: their refill request was fulfilled. */}
+      {refillFulfilled > dismissedFulfilled && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'rgba(45, 180, 100, 0.12)',
+            border: '0.5px solid #2db464',
+            color: '#2db464',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            {refillFulfilled} refill request{refillFulfilled === 1 ? '' : 's'} fulfilled — cylinders on the way back to this shop.
+          </span>
+          {(staff.role === 'admin' || staff.role === 'supervisor') && (
+            <button
+              type="button"
+              onClick={() => handleNav('/catalog?tab=refill-requests')}
+              style={{
+                border: 'none',
+                background: '#2db464',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '4px 10px',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              View
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setDismissedFulfilled(refillFulfilled)}
+            title="Dismiss"
+            style={{
+              border: 'none',
+              background: 'none',
+              color: '#2db464',
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '0 2px',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Mobile menu overlay */}
       {mobileOpen && (
         <div
@@ -389,7 +521,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
                 item={item}
                 currentPath={currentPath}
                 onClick={() => handleNav(item.path)}
+                onBadgeClick={() => handleNav('/catalog?tab=refill-requests')}
                 mobile
+                badge={item.path === '/catalog' ? refillWaiting : 0}
               />
             ))}
           </div>

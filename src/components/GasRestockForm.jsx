@@ -66,9 +66,13 @@ export default function GasRestockForm({
         }
       }
       allocatedSoFar = Number((allocatedSoFar + allocated).toFixed(2));
-      const totalCapitalized = Number((l.productCost + allocated).toFixed(2));
+      // Refilling moves the empty shell's fixed cylinder_value into the filled cost; a
+      // purchased filled cylinder's unit cost already includes its shell. Mirrors the backend.
+      const shellUnitValue = l.line.mode === "refill" ? Number(l.item?.cylinder_value || 0) : 0;
+      const shellTotal = Number((shellUnitValue * l.qty).toFixed(2));
+      const totalCapitalized = Number((l.productCost + allocated + shellTotal).toFixed(2));
       const landedUnitCost = l.qty > 0 ? Number((totalCapitalized / l.qty).toFixed(2)) : 0;
-      return { ...l, allocated, totalCapitalized, landedUnitCost };
+      return { ...l, allocated, shellUnitValue, totalCapitalized, landedUnitCost };
     });
     const productTotal = items.reduce((sum, l) => sum + l.productCost, 0);
     return {
@@ -280,6 +284,11 @@ export default function GasRestockForm({
                         maximumFractionDigits: 2,
                       }) || "0.00"}
                     </p>
+                    {calc?.shellUnitValue > 0 && (
+                      <p className="text-textMuted text-[11px]">
+                        includes KES {calc.shellUnitValue.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} shell value
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

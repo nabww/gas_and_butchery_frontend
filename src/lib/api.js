@@ -211,74 +211,8 @@ export async function checkBackendReachable() {
 }
 
 // ========== SALES API ==========
-
-export async function createSale(customerId = null, paymentMethod = "cash") {
-  return apiFetch("/sales", {
-    method: "POST",
-    body: JSON.stringify({
-      customer_id: customerId,
-      payment_method: paymentMethod,
-    }),
-  });
-}
-
-export async function getSale(saleId) {
-  return apiFetch(`/sales/${saleId}`);
-}
-
-export async function updateSaleCustomer(saleId, customerId) {
-  return apiFetch(`/sales/${saleId}/customer`, {
-    method: "PATCH",
-    body: JSON.stringify({ customer_id: customerId }),
-  });
-}
-
-export async function addItemToSale(
-  saleId,
-  { productId, cylinderBrandId, quantity, unitPrice },
-) {
-  return apiFetch(`/sales/${saleId}/items`, {
-    method: "POST",
-    body: JSON.stringify({
-      product_id: productId,
-      cylinder_brand_id: cylinderBrandId,
-      quantity: parseFloat(quantity),
-      unit_price: parseFloat(unitPrice),
-    }),
-  });
-}
-
-export async function removeItemFromSale(saleId, itemId) {
-  return apiFetch(`/sales/${saleId}/items/${itemId}`, {
-    method: "DELETE",
-  });
-}
-
-export async function updateItemQuantity(saleId, itemId, quantity) {
-  return apiFetch(`/sales/${saleId}/items/${itemId}/quantity`, {
-    method: "PATCH",
-    body: JSON.stringify({ quantity: parseFloat(quantity) }),
-  });
-}
-
-export async function applyDiscount(saleId, amount, type = "fixed") {
-  return apiFetch(`/sales/${saleId}/discount`, {
-    method: "POST",
-    body: JSON.stringify({ amount: parseFloat(amount), type }),
-  });
-}
-
-export async function completeSale(saleId) {
-  return apiFetch(`/sales/${saleId}/complete`, {
-    method: "POST",
-  });
-}
-
-export async function voidSale(saleId) {
-  return apiFetch(`/sales/${saleId}/void`, {
-    method: "POST",
-  });
-}
+// Sales run offline-first through lib/db/syncQueue + lib/saleOperations.js;
+// only the receipt fetch still calls the REST API directly.
 
 export async function getSaleReceipt(saleId) {
   const token = getToken();
@@ -291,31 +225,7 @@ export async function getSaleReceipt(saleId) {
   return res.text();
 }
 
-export async function recordCylinderExchange(
-  saleId,
-  { emptyBrandId, issuedBrandId, priceAdjustment = 0 },
-) {
-  return apiFetch(`/sales/${saleId}/exchanges`, {
-    method: "POST",
-    body: JSON.stringify({
-      empty_brand_id: emptyBrandId,
-      issued_brand_id: issuedBrandId,
-      price_adjustment: parseFloat(priceAdjustment),
-    }),
-  });
-}
-
 // ========== PAYMENTS API ==========
-
-export async function processCashPayment(saleId, amountPaid) {
-  return apiFetch("/payments/cash", {
-    method: "POST",
-    body: JSON.stringify({
-      sale_id: saleId,
-      amount_paid: parseFloat(amountPaid),
-    }),
-  });
-}
 
 export async function initiateM2pesa(phone, amount) {
   return apiFetch("/payments/mpesa/initiate", {
@@ -455,10 +365,6 @@ export async function listCorporateAccounts() {
   return apiFetch("/corporate/accounts");
 }
 
-export async function getCorporateAccount(corporateAccountId) {
-  return apiFetch(`/corporate/accounts/${corporateAccountId}`);
-}
-
 export async function createCorporateAccount(customerId, creditLimit) {
   return apiFetch("/corporate/accounts", {
     method: "POST",
@@ -470,13 +376,6 @@ export async function updateCorporateCreditLimit(corporateAccountId, creditLimit
   return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-limit`, {
     method: "PATCH",
     body: JSON.stringify({ credit_limit: parseFloat(creditLimit) }),
-  });
-}
-
-export async function checkCorporateCreditLimit(corporateAccountId, saleTotal) {
-  return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-check`, {
-    method: "POST",
-    body: JSON.stringify({ sale_total: parseFloat(saleTotal) }),
   });
 }
 
@@ -499,13 +398,6 @@ export async function removeCorporatePricing(corporateAccountId, productId) {
 
 export async function listCorporateInvoices(corporateAccountId) {
   return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices`);
-}
-
-export async function generateTransactionInvoice(corporateAccountId, saleId) {
-  return apiFetch(`/corporate/accounts/${corporateAccountId}/invoices/transaction`, {
-    method: "POST",
-    body: JSON.stringify({ sale_id: saleId }),
-  });
 }
 
 export async function getInvoiceDetails(invoiceId) {
@@ -577,10 +469,6 @@ export async function updateCylinderBrand(brandId, brandData, locationId) {
 
 export async function searchCustomers(query) {
   return apiFetch(`/customers/search?q=${encodeURIComponent(query)}`);
-}
-
-export async function getCustomer(customerId) {
-  return apiFetch(`/customers/${customerId}`);
 }
 
 export async function getCustomerByPhone(phone) {
@@ -690,17 +578,10 @@ export async function getLowStockAlerts(locationId) {
   return apiFetch(`/stock-admin/cylinders/alerts${query}`);
 }
 
-export async function adjustCylinderStock(brandId, data, locationId) {
-  return apiFetch(`/stock-admin/cylinders/${brandId}`, {
-    method: "PUT",
-    body: JSON.stringify(locationId ? { ...data, location_id: locationId } : data),
-  });
-}
-
-export async function updateStockThreshold(brandId, threshold, locationId) {
-  return apiFetch(`/stock-admin/cylinders/${brandId}/threshold`, {
-    method: "PUT",
-    body: JSON.stringify(locationId ? { threshold, location_id: locationId } : { threshold }),
+export async function recordStockLoss(payload) {
+  return apiFetch("/expenses/stock-loss", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -732,10 +613,62 @@ export async function resolveOversellFlag(flagId) {
   });
 }
 
-export async function redeemPoints(customerId, saleId, points) {
-  return apiFetch("/loyalty/redeem", {
+export async function listRefillRequests(locationId, status = null) {
+  const query = new URLSearchParams();
+  if (locationId) query.set("location_id", locationId);
+  if (status) query.set("status", status);
+  const suffix = query.toString();
+  return apiFetch(`/stock-admin/refill-requests${suffix ? `?${suffix}` : ""}`);
+}
+
+export async function getRefillRequest(requestId) {
+  return apiFetch(`/stock-admin/refill-requests/${requestId}`);
+}
+
+export async function createRefillRequest(payload) {
+  return apiFetch("/stock-admin/refill-requests", {
     method: "POST",
-    body: JSON.stringify({ customer_id: customerId, sale_id: saleId, points }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fulfillRefillRequest(requestId, payload) {
+  return apiFetch(`/stock-admin/refill-requests/${requestId}/fulfill`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelRefillRequest(requestId, reason) {
+  return apiFetch(`/stock-admin/refill-requests/${requestId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function listAnimalPurchases(locationId, status = null) {
+  const query = new URLSearchParams();
+  if (locationId) query.set("location_id", locationId);
+  if (status) query.set("status", status);
+  const suffix = query.toString();
+  return apiFetch(`/expenses/animal-purchases${suffix ? `?${suffix}` : ""}`);
+}
+
+export async function getAnimalPurchase(purchaseId) {
+  return apiFetch(`/expenses/animal-purchases/${purchaseId}`);
+}
+
+export async function createAnimalPurchase(payload) {
+  return apiFetch("/expenses/animal-purchases", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function slaughterAnimal(purchaseId, payload) {
+  return apiFetch(`/expenses/animal-purchases/${purchaseId}/slaughter`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -821,10 +754,6 @@ export async function getFastMovingProducts(startDate, endDate, locationId, sort
 
 // ========== SYNC API ==========
 
-export async function getSyncSnapshot(locationId) {
-  return apiFetch(`/sync/snapshot?location_id=${locationId}`);
-}
-
 export async function uploadSyncSnapshot(snapshot) {
   return apiFetch("/sync/upload", {
     method: "POST",
@@ -895,20 +824,6 @@ export async function createExpense(payload) {
   });
 }
 
-export async function createGasRefill(payload) {
-  return apiFetch("/expenses/gas-refills", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function createGasPurchase(payload) {
-  return apiFetch("/expenses/gas-purchases", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function createGasRestock(payload) {
   return apiFetch("/expenses/gas-restock", {
     method: "POST",
@@ -918,6 +833,13 @@ export async function createGasRestock(payload) {
 
 export async function createProductRestock(payload) {
   return apiFetch("/expenses/product-restock", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recordStockTake(payload) {
+  return apiFetch("/expenses/stock-take", {
     method: "POST",
     body: JSON.stringify(payload),
   });

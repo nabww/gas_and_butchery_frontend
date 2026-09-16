@@ -116,13 +116,11 @@ function KpiCard({ label, value, subtext, tone = "default" }) {
   const toneClasses = {
     default: "border-borderColor bg-surface2",
     success: "border-success/30 bg-success/5",
-    warning: "border-warning/30 bg-warning/5",
     danger: "border-danger/30 bg-danger/5",
   };
   const textTone = {
     default: "text-textPrimary",
     success: "text-success",
-    warning: "text-warning",
     danger: "text-danger",
   };
   return (
@@ -131,6 +129,52 @@ function KpiCard({ label, value, subtext, tone = "default" }) {
       <p className={`text-2xl font-bold mt-1 ${textTone[tone]}`}>{value}</p>
       {subtext && <p className="text-textMuted text-xs mt-1">{subtext}</p>}
     </div>
+  );
+}
+
+// Hero KPIs — the numbers the owner checks first. Larger type, denser card.
+function HeroCard({ label, value, subtext, tone = "default" }) {
+  const toneClasses = {
+    default: "border-borderColor bg-surface2",
+    success: "border-success/40 bg-success/5",
+    danger: "border-danger/40 bg-danger/10",
+  };
+  const textTone = {
+    default: "text-textPrimary",
+    success: "text-success",
+    danger: "text-danger",
+  };
+  return (
+    <div className={`rounded-2xl border-2 p-5 ${toneClasses[tone]}`}>
+      <p className="text-textSecondary text-xs font-semibold uppercase tracking-wider">{label}</p>
+      <p className={`text-3xl sm:text-4xl font-bold mt-2 ${textTone[tone]}`}>{value}</p>
+      {subtext && <p className="text-textSecondary text-xs mt-2">{subtext}</p>}
+    </div>
+  );
+}
+
+// A named KPI group. Cards flagged `zero` collapse into a single muted
+// "nothing to report" line — zero-activity cards add scan fatigue without
+// conveying information.
+function KpiSection({ title, cards }) {
+  const active = cards.filter((c) => !c.zero);
+  const quiet = cards.filter((c) => c.zero);
+  return (
+    <section className="mb-6">
+      <h2 className="text-textMuted text-xs font-bold uppercase tracking-wider mb-2">{title}</h2>
+      {active.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {active.map((card) => (
+            <KpiCard key={card.label} {...card} />
+          ))}
+        </div>
+      )}
+      {quiet.length > 0 && (
+        <p className="text-textMuted text-xs mt-2">
+          Nothing to report: {quiet.map((card) => card.label).join(" · ")}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -295,6 +339,23 @@ export default function Dashboard({ onNavigate }) {
   const redemptionCount = expenses?.rewardsIssuedCount || 0;
   const prevRevenue = prevSales?.summary?.totalRevenue || 0;
   const revenueChange = prevRevenue === 0 ? 0 : ((revenue - prevRevenue) / prevRevenue) * 100;
+  const marginPct = (sales?.summary?.grossProfitMargin || 0) * 100;
+  // Red means "needs attention" only — oversells, low stock, unpaid credit,
+  // money owed to customers (promo payouts) and overdue corporate invoices.
+  const flagCount =
+    oversells.length +
+    lowStock.length +
+    (creditBalance < 0 ? 1 : 0) +
+    (pendingPromoCount > 0 ? 1 : 0) +
+    (overdue > 0 ? 1 : 0);
+  const flagDetail = [
+    oversells.length && `${oversells.length} oversell(s)`,
+    lowStock.length && `${lowStock.length} low stock`,
+    creditBalance < 0 && "unpaid credit",
+    pendingPromoCount > 0 && `${pendingPromoCount} promo payout(s)`,
+    overdue > 0 && "overdue invoices",
+  ].filter(Boolean).join(" · ");
+  const discountsHigh = revenue > 0 && discounts > revenue * 0.15;
 
   const narratives = useMemo(() => {
     const items = [];
@@ -428,103 +489,103 @@ export default function Dashboard({ onNavigate }) {
         </section>
       )}
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Total sales" value={formatKes(revenue)} subtext={`${transactions} transactions, incl. credit`} />
-        <KpiCard label="Cash" value={formatKes(cash)} />
-        <KpiCard label="M-Pesa" value={formatKes(mpesa)} />
-        <KpiCard
-          label="Net cash movement"
+      {/* Hero row — the four numbers the owner checks first. */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <HeroCard
+          label="Sales"
+          value={formatKes(revenue)}
+          subtext={`${transactions} transactions${prevRevenue > 0 ? ` · ${revenueChange >= 0 ? "+" : ""}${revenueChange.toFixed(1)}% vs previous period` : ""}`}
+        />
+        <HeroCard
+          label="Gross margin"
+          value={`${marginPct.toFixed(1)}%`}
+          subtext={`${formatKes(grossProfit)} gross profit`}
+          tone={grossProfit > 0 ? "success" : grossProfit < 0 ? "danger" : "default"}
+        />
+        <HeroCard
+          label="Net cash"
           value={formatKes(totalIncome)}
           subtext="Collected income less recorded costs for this period"
-          tone={totalIncome >= 0 ? "success" : "danger"}
+          tone={totalIncome > 0 ? "success" : totalIncome < 0 ? "danger" : "default"}
+        />
+        <HeroCard
+          label="Needs attention"
+          value={flagCount === 0 ? "All clear" : flagCount}
+          subtext={flagCount === 0 ? "No flagged items right now" : flagDetail}
+          tone={flagCount > 0 ? "danger" : "success"}
         />
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard
-          label="COGS"
-          value={formatKes(cogs)}
-          subtext="Cost of gas/products sold in selected period"
-          tone="warning"
-        />
-        <KpiCard
-          label="Gross profit"
-          value={formatKes(grossProfit)}
-          subtext="Revenue less cost of goods sold"
-          tone={grossProfit >= 0 ? "success" : "danger"}
-        />
-        <KpiCard
-          label="Inventory value"
-          value={formatKes(inventoryValue?.totalValue)}
-          subtext="Current stock value at landed cost"
-        />
-        <KpiCard
-          label="Gross margin"
-          value={`${((sales?.summary?.grossProfitMargin || 0) * 100).toFixed(1)}%`}
-          subtext="Gross profit as a share of revenue"
-        />
-      </section>
+      <KpiSection
+        title="Sales & Cash"
+        cards={[
+          { label: "Cash", value: formatKes(cash) },
+          { label: "M-Pesa", value: formatKes(mpesa) },
+          { label: "Account / credit sales", value: formatKes(account) },
+          {
+            label: "Unpaid credit",
+            value: formatKes(Math.abs(creditBalance)),
+            subtext: `${income?.creditExtendedCount || 0} credit sale(s) in the selected period, unpaid`,
+            tone: creditBalance < 0 ? "danger" : "default",
+            zero: creditBalance >= 0,
+          },
+          { label: "Top customer in period", value: formatKes(topCustomers[0]?.total_spend || 0), subtext: topCustomers[0]?.name || "No sales yet", zero: !topCustomers[0] },
+        ]}
+      />
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard
-          label="Restock expenses"
-          value={formatKes(restockExpenses)}
-          subtext={`${formatKes(expenses?.stock || 0)} inventory · ${formatKes(expenses?.refills || 0)} gas refills`}
-          tone={restockExpenses > 0 ? "warning" : "default"}
-        />
-        <KpiCard
-          label="Operating expenses"
-          value={formatKes(operatingExpenses)}
-          subtext="Transport, utilities, wages and other costs"
-          tone={operatingExpenses > 0 ? "warning" : "default"}
-        />
-        <KpiCard
-          label="All expenses"
-          value={formatKes(expenses?.total || 0)}
-          subtext="Restocks, operating costs, promotions and rewards"
-          tone={Number(expenses?.total || 0) > 0 ? "danger" : "default"}
-        />
-        <KpiCard
-          label="Recorded expense entries"
-          value={expenses?.postedCount || 0}
-          subtext={isToday ? "Posted today" : "Posted in selected period"}
-        />
-      </section>
+      <KpiSection
+        title="Profitability"
+        cards={[
+          { label: "COGS", value: formatKes(cogs), subtext: "Cost of goods sold in selected period" },
+          {
+            label: "Gross profit",
+            value: formatKes(grossProfit),
+            subtext: "Revenue less cost of goods sold",
+            tone: grossProfit > 0 ? "success" : grossProfit < 0 ? "danger" : "default",
+          },
+          { label: "Operating expenses", value: formatKes(operatingExpenses), subtext: "Transport, utilities, wages and other costs", zero: operatingExpenses <= 0 },
+          { label: "All expenses", value: formatKes(expenses?.total || 0), subtext: "Restocks, operating costs, promotions and rewards", zero: Number(expenses?.total || 0) <= 0 },
+          { label: "Recorded expense entries", value: expenses?.postedCount || 0, subtext: isToday ? "Posted today" : "Posted in selected period", zero: !expenses?.postedCount },
+        ]}
+      />
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <KpiCard
-          label="Discounts"
-          value={formatKes(discounts)}
-          subtext="Manual and approved discounts"
-          tone="warning"
-        />
-        <KpiCard
-          label="Points redemptions"
-          value={formatKes(pointRedemptions)}
-          subtext={`${pointRedemptionCount} redemptions at checkout`}
-          tone="success"
-        />
-        <KpiCard
-          label="Period loyalty liability"
-          value={formatKes(loyaltyLiability)}
-          subtext="Net new points value earned in the selected period"
-          tone={loyaltyLiability > 0 ? "warning" : "default"}
-        />
-        <KpiCard label="Pending promo payouts" value={formatKes(pendingPromo)} subtext={`${pendingPromoCount} pending`} tone="danger" />
-        <KpiCard label="Reward redemptions" value={formatKes(redemptions)} subtext={`${redemptionCount} redemptions`} tone="success" />
-      </section>
+      <KpiSection
+        title="Inventory"
+        cards={[
+          { label: "Inventory value", value: formatKes(inventoryValue?.totalValue), subtext: "Current stock value at landed cost" },
+          {
+            label: "Restock expenses",
+            value: formatKes(restockExpenses),
+            subtext: `${formatKes(expenses?.stock || 0)} inventory · ${formatKes(expenses?.refills || 0)} gas refills`,
+            zero: restockExpenses <= 0,
+          },
+          { label: "Low-stock items", value: lowStock.length, tone: lowStock.length > 0 ? "danger" : "default", zero: lowStock.length === 0 },
+          { label: "Unresolved oversells", value: oversells.length, tone: oversells.length > 0 ? "danger" : "default", zero: oversells.length === 0 },
+        ]}
+      />
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <KpiCard
-          label="Credit balance"
-          value={formatKes(creditBalance)}
-          subtext={`${income?.creditExtendedCount || 0} credit sale(s) in the selected period, unpaid`}
-          tone={creditBalance < 0 ? "warning" : "default"}
-        />
-        <KpiCard label="Low-stock items" value={lowStock.length} tone={lowStock.length > 0 ? "warning" : "default"} />
-        <KpiCard label="Unresolved oversells" value={oversells.length} tone={oversells.length > 0 ? "danger" : "default"} />
-        <KpiCard label="Top customer in period" value={formatKes(topCustomers[0]?.total_spend || 0)} subtext={topCustomers[0]?.name || "No sales yet"} />
-      </section>
+      <KpiSection
+        title="Loyalty & Promotions"
+        cards={[
+          {
+            label: "Discounts",
+            value: formatKes(discounts),
+            subtext: "Manual and approved discounts",
+            tone: discountsHigh ? "danger" : "default",
+            zero: discounts <= 0,
+          },
+          { label: "Points redemptions", value: formatKes(pointRedemptions), subtext: `${pointRedemptionCount} redemptions at checkout`, zero: pointRedemptions <= 0 },
+          { label: "Period loyalty liability", value: formatKes(loyaltyLiability), subtext: "Net new points value earned in the selected period", zero: loyaltyLiability <= 0 },
+          {
+            label: "Pending promo payouts",
+            value: formatKes(pendingPromo),
+            subtext: `${pendingPromoCount} pending`,
+            tone: pendingPromoCount > 0 ? "danger" : "default",
+            zero: pendingPromoCount === 0,
+          },
+          { label: "Reward redemptions", value: formatKes(redemptions), subtext: `${redemptionCount} redemptions`, zero: redemptions <= 0 },
+        ]}
+      />
 
       {recentSales.length > 0 && (
         <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mb-6">
@@ -577,7 +638,7 @@ export default function Dashboard({ onNavigate }) {
               <div className="space-y-1">
                 {oversells.slice(0, 5).map((flag) => (
                   <div key={flag.id} className="text-sm text-textPrimary">
-                    {flag.item_type} requested {flag.requested_qty} / available {flag.available_qty}
+                    {flag.display_name || flag.item_name || flag.item_type} — requested {flag.requested} / available {flag.available}
                   </div>
                 ))}
               </div>

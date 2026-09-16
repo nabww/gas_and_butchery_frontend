@@ -3,6 +3,7 @@ import {
   getCylinderBrands,
   createCylinderBrand,
   updateCylinderBrand,
+  recordStockTake,
 } from "../lib/api";
 import { useActiveLocation } from "../contexts/LocationContext";
 
@@ -41,6 +42,12 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
   const [isActive, setIsActive] = useState(Boolean(defaults.is_active));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Unit costs for quantities being ADDED (opening stock / stock take) —
+  // additions at a cost post a capitalized expense; blank cost means the
+  // entry is a count correction, not a purchase.
+  const [filledCost, setFilledCost] = useState('');
+  const [emptyCost, setEmptyCost] = useState('');
+  const [takePaymentMethod, setTakePaymentMethod] = useState('cash');
 
   useEffect(() => {
     let isMounted = true;
@@ -145,47 +152,64 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
     setSaving(true);
     setError('');
 
+    // Quantities being ADDED post an opening-stock expense at the cost entered
+    // (empty shells default to the brand's cylinder value); reductions are
+    // plain count corrections, not expenses. Added stock always has a cost —
+    // require it so stock can't enter the books valueless.
+    const selected = existingBrands.find((b) => String(b.id) === selectedBrandId);
+    const base = editing || selected;
+    const newFilled = Number(filledQty || 0);
+    const newEmpty = Number(emptyQty || 0);
+    const addedFilled = Math.max(0, newFilled - Number(base?.filled_qty || 0));
+    const addedEmpty = Math.max(0, newEmpty - Number(base?.empty_qty || 0));
+
+    if (addedFilled > 0 && !(Number(filledCost) > 0)) {
+      setError('Enter what each added filled cylinder cost — added stock is an expense');
+      return;
+    }
+
+    const buildTakeLines = (brandId) => {
+      const lines = [];
+      if (addedFilled > 0) {
+        lines.push({ kind: 'cylinder_filled', cylinder_brand_id: brandId, quantity: addedFilled, unit_cost: Number(filledCost) });
+      }
+      if (addedEmpty > 0) {
+        lines.push({ kind: 'cylinder_empty', cylinder_brand_id: brandId, quantity: addedEmpty, unit_cost: Number(emptyCost || 0) });
+      }
+      return lines;
+    };
+
+    const brandPayload = {
+      brand: brand.trim(),
+      weight_kg: weight,
+      refill_price: refill,
+      cylinder_value: cylinder,
+      low_stock_threshold: Number(lowStockThreshold || 0),
+      is_active: isActive,
+    };
+
     try {
-      if (editing) {
-        const payload = {
-          brand: brand.trim(),
-          weight_kg: weight,
-          refill_price: refill,
-          cylinder_value: cylinder,
-          low_stock_threshold: Number(lowStockThreshold || 0),
-          filled_qty: Number(filledQty || 0),
-          empty_qty: Number(emptyQty || 0),
-          is_active: isActive,
-        };
-        await updateCylinderBrand(editing.cylinder_brand_id, payload, activeLocationId);
-      } else if (isNewBrand) {
-        const payload = {
-          brand: brand.trim(),
-          weight_kg: weight,
-          refill_price: refill,
-          cylinder_value: cylinder,
-          low_stock_threshold: Number(lowStockThreshold || 0),
-          filled_qty: Number(filledQty || 0),
-          empty_qty: Number(emptyQty || 0),
-          is_active: isActive,
-        };
-        await createCylinderBrand(payload, activeLocationId);
-      } else {
-        const selected = existingBrands.find(
-          (b) => String(b.id) === selectedBrandId,
+      if (isNewBrand) {
+        const stockRows = await createCylinderBrand(
+          { ...brandPayload, filled_qty: 0, empty_qty: 0 },
+          activeLocationId,
         );
-        if (!selected) {
-          setError('Please select an existing brand');
-          setSaving(false);
-          return;
+        const created = (stockRows || []).find(
+          (row) => row.brand === brand.trim() && Number(row.weight_kg) === weight,
+        );
+        if (!created) throw new Error('Brand was created but could not be located for stock take');
+        const takeLines = buildTakeLines(created.cylinder_brand_id);
+        if (takeLines.length) {
+          await recordStockTake({ location_id: activeLocationId, payment_method: takePaymentMethod, lines: takeLines });
         }
-        const payload = {
-          filled_qty: Number(filledQty || 0),
-          empty_qty: Number(emptyQty || 0),
-          low_stock_threshold: Number(lowStockThreshold || 0),
-          is_active: isActive,
-        };
-        await updateCylinderBrand(selected.id, payload, activeLocationId);
+        await updateCylinderBrand(created.cylinder_brand_id, { filled_qty: newFilled, empty_qty: newEmpty }, activeLocationId);
+      } else {
+        const brandId = editing ? editing.cylinder_brand_id : selected.id;
+        const takeLines = buildTakeLines(brandId);
+        if (takeLines.length) {
+          await recordStockTake({ location_id: activeLocationId, payment_method: takePaymentMethod, lines: takeLines });
+        }
+        await updateCylinderBrand(brandId, { ...brandPayload, filled_qty: newFilled, empty_qty: newEmpty }, activeLocationId);
       }
 
       onSaved();
@@ -197,7 +221,8 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
   };
 
   const isBrandLocked = !isNewBrand && !editing;
-  const isPropertyReadOnly = isBrandLocked;
+  // Prices stay editable when adding stock to an existing brand — refill price
+  // and shell value change over time without needing a full brand edit.
   const title = editing
     ? 'Edit cylinder brand'
     : isNewBrand
@@ -219,6 +244,14 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
         : 'Add stock';
 
   const hasSelection = editing || isNewBrand || selectedBrandId;
+
+  // Live preview of what's being added vs the current count — additions can
+  // carry a cost (posted as an opening-stock expense).
+  const selectedNow = existingBrands.find((b) => String(b.id) === selectedBrandId);
+  const baseNow = editing || selectedNow;
+  const previewAddedFilled = Math.max(0, Number(filledQty || 0) - Number(baseNow?.filled_qty || 0));
+  const previewAddedEmpty = Math.max(0, Number(emptyQty || 0) - Number(baseNow?.empty_qty || 0));
+  const showTakeFields = previewAddedFilled > 0 || previewAddedEmpty > 0;
 
   return (
     <form
@@ -301,7 +334,6 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
               step='0.01'
               value={refillPrice}
               onChange={(e) => setRefillPrice(e.target.value)}
-              disabled={isPropertyReadOnly}
             />
           </div>
           <div>
@@ -315,7 +347,6 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
               step='0.01'
               value={cylinderValue}
               onChange={(e) => setCylinderValue(e.target.value)}
-              disabled={isPropertyReadOnly}
             />
           </div>
           <div>
@@ -364,7 +395,64 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
               Active
             </label>
           </div>
+
+          {previewAddedFilled > 0 && (
+            <div>
+              <label className='text-textMuted text-xs block mb-1'>
+                Cost per added filled cylinder (KES)
+              </label>
+              <input
+                className={inputClass}
+                type='number'
+                min='0'
+                step='0.01'
+                value={filledCost}
+                onChange={(e) => setFilledCost(e.target.value)}
+                placeholder='Required — what you paid per cylinder'
+              />
+            </div>
+          )}
+          {previewAddedEmpty > 0 && (
+            <div>
+              <label className='text-textMuted text-xs block mb-1'>
+                Cost per added empty (KES)
+              </label>
+              <input
+                className={inputClass}
+                type='number'
+                min='0'
+                step='0.01'
+                value={emptyCost}
+                onChange={(e) => setEmptyCost(e.target.value)}
+                placeholder={`Defaults to shell value (${Number(cylinderValue || 0).toFixed(2)})`}
+              />
+            </div>
+          )}
+          {showTakeFields && (
+            <div>
+              <label className='text-textMuted text-xs block mb-1'>
+                Paid by
+              </label>
+              <select
+                className={inputClass}
+                value={takePaymentMethod}
+                onChange={(e) => setTakePaymentMethod(e.target.value)}>
+                <option value='cash'>Cash</option>
+                <option value='mpesa'>M-Pesa</option>
+                <option value='account'>On account</option>
+              </select>
+            </div>
+          )}
         </div>
+      )}
+
+      {showTakeFields && (
+        <p className='text-textMuted text-xs'>
+          Quantities added above the current count are recorded as an
+          opening-stock expense — filled cylinders at the cost entered, empty
+          shells at the cylinder value unless overridden. Reducing a count is
+          a correction — no expense.
+        </p>
       )}
 
       {!hasSelection && !editing && (

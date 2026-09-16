@@ -123,9 +123,15 @@ export default function ProductCatalog({
   }, []);
 
   const filteredProducts = useMemo(() => {
+    // Pool products only exist on the till once their pool has actually been
+    // stocked here (slaughter recorded → pool row exists → pool_unit set).
+    // A stocked-but-empty pool still shows so it can sell into an oversell flag.
+    const visible = products.filter(
+      (p) => !p.pool_key || p.pool_unit,
+    );
     const term = search.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((p) =>
+    if (!term) return visible;
+    return visible.filter((p) =>
       (p.name || "").toLowerCase().includes(term),
     );
   }, [products, search]);
@@ -175,9 +181,8 @@ export default function ProductCatalog({
             type="button"
             onClick={handleRefresh}
             disabled={loading}
-            className="px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors"
-            title="Refresh products">
-            ↻
+            className="px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors whitespace-nowrap">
+            {loading ? "Refreshing…" : "↻ Refresh stock"}
           </button>
         </div>
       </div>

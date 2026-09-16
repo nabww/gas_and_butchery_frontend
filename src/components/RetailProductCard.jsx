@@ -26,6 +26,38 @@ function getIcon(product) {
   return null;
 }
 
+function stockCue(product) {
+  const qty = Number(product.qty_on_hand ?? 0);
+  if (qty <= 0) return "empty";
+  // Exact quantities are tracked — flag genuinely low stock. Pools use the
+  // product's threshold; without one, <1kg (or <1 piece) is the warning line.
+  const threshold = Number(product.low_stock_threshold ?? 0);
+  const unit = product.pool_unit === "piece" ? "piece" : "kg";
+  const lowAt = threshold > 0 ? threshold : unit === "kg" ? 1 : 1;
+  return qty <= lowAt ? "low" : "ok";
+}
+
+function StockBalance({ product }) {
+  const qty = Number(product.qty_on_hand ?? 0);
+  const unit = product.pool_key
+    ? product.pool_unit === "piece"
+      ? "pcs"
+      : "kg"
+    : "";
+  const cue = stockCue(product);
+  const tone =
+    cue === "empty"
+      ? "text-danger"
+      : cue === "low"
+        ? "text-warning"
+        : "text-textSecondary";
+  return (
+    <p className={`text-xs font-semibold mt-1 ${tone}`}>
+      {cue === "empty" ? "Out of stock" : cue === "low" ? `Low: ${Number(qty.toFixed(3))}${unit ? ` ${unit}` : ""} left` : `In stock: ${Number(qty.toFixed(3))}${unit ? ` ${unit}` : ""}`}
+    </p>
+  );
+}
+
 function RetailProductCard({ product, onToast }) {
   const { saleId, saleLocalId, items, addItem, updateItem, corporatePricing } = useCart();
   // Corporate clients get their own negotiated price per product, set by
@@ -42,6 +74,13 @@ function RetailProductCard({ product, onToast }) {
   const [isAdding, setIsAdding] = useState(false);
 
   const icon = getIcon(product);
+
+  const isTracked = Boolean(product.pool_key || product.track_stock);
+  const isOutOfStock = isTracked && Number(product.qty_on_hand ?? 0) <= 0;
+  // Pool products are intentionally oversellable (butchery weighs/sells past
+  // recorded stock — the sale flags an oversell). Hard-tracked items like
+  // accessories cannot be sold at zero.
+  const canSellWhenEmpty = Boolean(product.pool_key);
 
   const step = isWeighted ? 0.1 : 1;
   const min = isWeighted ? 0.1 : 1;
@@ -120,8 +159,20 @@ function RetailProductCard({ product, onToast }) {
     }
   };
 
+  // Hard-tracked items at zero get a compact info tile — not the full
+  // interactive card (no steppers, no add button, nothing to mis-tap).
+  if (isOutOfStock && !canSellWhenEmpty) {
+    return (
+      <div className="flex flex-col min-w-0 rounded-2xl bg-surface1 border border-dashed border-borderColor p-3 sm:p-4 opacity-60">
+        <h3 className="text-textMuted font-bold text-base truncate">{product.name}</h3>
+        <p className="text-textMuted text-sm font-semibold mt-1">{formatKes(unitPrice)}</p>
+        <p className="text-danger text-xs font-bold mt-2 uppercase tracking-wide">Out of stock</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-3 sm:p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
+    <div className={`group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-3 sm:p-4 shadow-card transition-all duration-200 ${isOutOfStock ? "opacity-60" : "hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong"}`}>
       {icon && (
         <div className="flex items-center justify-center h-20 sm:h-28 rounded-xl bg-surface1 border border-borderColor mb-3 sm:mb-4 text-4xl sm:text-5xl">
           {icon}
@@ -143,17 +194,24 @@ function RetailProductCard({ product, onToast }) {
         <p className="text-textMuted text-sm mt-0.5">
           {product.pricing_type === "weighted" ? "Per kg" : "Fixed"}
         </p>
+        {(product.pool_key || product.track_stock) && (
+          <StockBalance product={product} />
+        )}
       </div>
 
       <div className="flex items-center justify-between mb-2 sm:mb-3 mt-auto">
         <span className="text-textSecondary text-sm font-medium">Qty</span>
-        <QuantityStepper
-          value={quantity}
-          onChange={setQuantity}
-          min={min}
-          step={step}
-          size="md"
-        />
+        {isOutOfStock ? (
+          <span className="text-textMuted text-xs italic">—</span>
+        ) : (
+          <QuantityStepper
+            value={quantity}
+            onChange={setQuantity}
+            min={min}
+            step={step}
+            size="md"
+          />
+        )}
       </div>
 
       {isWeighted && (
@@ -181,8 +239,12 @@ function RetailProductCard({ product, onToast }) {
         type="button"
         onClick={handleAdd}
         disabled={isAdding || !saleId}
-        className="w-full rounded-xl bg-primary text-onPrimary font-semibold py-3 px-4 transition-all duration-150 hover:bg-primaryDark active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-        {isAdding ? "Adding..." : "Add to Cart"}
+        className={`w-full rounded-xl font-semibold py-3 px-4 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+          isOutOfStock
+            ? "bg-warning/15 text-warning border border-warning/40 hover:bg-warning/25"
+            : "bg-primary text-onPrimary hover:bg-primaryDark"
+        }`}>
+        {isAdding ? "Adding..." : isOutOfStock ? "Sell anyway (records oversell)" : "Add to Cart"}
       </button>
     </div>
   );
