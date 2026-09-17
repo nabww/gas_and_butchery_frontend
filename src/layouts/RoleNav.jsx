@@ -205,7 +205,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
   const [refillWaiting, setRefillWaiting] = useState(0);
   const [refillFulfilled, setRefillFulfilled] = useState(0);
   // Dismissed-count: closing the green banner hides it until another
-  // request is fulfilled (count rises above what was dismissed).
+  // request is fulfilled (count rises above what was dismissed). Persisted
+  // per shop so the banner stays closed across navigation/reloads.
+  const dismissalKey = `refill-fulfilled-dismissed:${activeLocationId || "all"}`;
   const [dismissedFulfilled, setDismissedFulfilled] = useState(0);
   const topBarRef = useRef(null);
   const navRef = useRef(null);
@@ -250,7 +252,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
     return () => { cancelled = true; clearInterval(timer); };
   }, [staff.role, activeLocationId]);
 
-  useEffect(() => { setDismissedFulfilled(0); }, [activeLocationId]);
+  useEffect(() => {
+    setDismissedFulfilled(Number(localStorage.getItem(dismissalKey) || 0));
+  }, [activeLocationId]);
 
   const handleNav = (path) => {
     setMobileOpen(false);
@@ -481,7 +485,10 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           )}
           <button
             type="button"
-            onClick={() => setDismissedFulfilled(refillFulfilled)}
+            onClick={() => {
+              localStorage.setItem(dismissalKey, String(refillFulfilled));
+              setDismissedFulfilled(refillFulfilled);
+            }}
             title="Dismiss"
             style={{
               border: 'none',

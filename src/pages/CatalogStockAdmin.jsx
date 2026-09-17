@@ -43,20 +43,14 @@ const inputClass =
 // stock row — e.g. mixed beef, steak and mince all deduct from 'beef'.
 const POOL_OPTIONS = [
   { value: "beef", label: "Beef — meat & bones (kg)" },
-  { value: "liver", label: "Liver (kg)" },
-  { value: "kidney", label: "Kidney (kg)" },
-  { value: "heart", label: "Heart (kg)" },
-  { value: "tripe", label: "Tripe (kg)" },
+  { value: "organs", label: "Organs — liver, kidney, heart (kg)" },
   { value: "tongue", label: "Tongue (kg)" },
   { value: "matumbo", label: "Matumbo (kg)" },
   { value: "lungs", label: "Lungs (kg)" },
   { value: "heads", label: "Heads (pieces)" },
   { value: "legs", label: "Legs (pieces)" },
   { value: "goat", label: "Goat meat (kg)" },
-  { value: "goat_liver", label: "Goat liver (kg)" },
-  { value: "goat_kidney", label: "Goat kidney (kg)" },
-  { value: "goat_heart", label: "Goat heart (kg)" },
-  { value: "goat_tripe", label: "Goat tripe (kg)" },
+  { value: "goat_organs", label: "Goat organs — liver, kidney, heart (kg)" },
   { value: "goat_tongue", label: "Goat tongue (kg)" },
   { value: "goat_matumbo", label: "Goat matumbo (kg)" },
   { value: "goat_lungs", label: "Goat lungs (kg)" },
@@ -645,9 +639,10 @@ function GasStockRow({
   );
 }
 
-function CatalogTab() {
+function CatalogTab({ staffRole }) {
   const { activeLocationId } = useActiveLocation();
   const [products, setProducts] = useState([]);
+  const [oversells, setOversells] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -655,13 +650,20 @@ function CatalogTab() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const isAdmin = staffRole === "admin";
 
   const fetchProducts = async () => {
     setLoading(true);
     setError("");
     try {
-      const rows = await getProducts(null, true, activeLocationId);
+      const [rows, oversellData] = await Promise.all([
+        getProducts(null, true, activeLocationId),
+        getOversellFlags(false, activeLocationId),
+      ]);
       setProducts(rows);
+      // Butchery pool flags live here at the top of the list; cylinder
+      // flags stay on the Gas Stock tab.
+      setOversells((oversellData || []).filter((f) => f.item_type === "pool"));
     } catch (err) {
       setError(err.message || "Failed to load catalog");
     } finally {
@@ -709,6 +711,17 @@ function CatalogTab() {
     setExpandedId(null);
   };
 
+  // Pool oversells are a counting discrepancy, not a missing physical item —
+  // they resolve on review without needing a stock adjustment first.
+  const handleResolveOversell = async (flagId) => {
+    try {
+      await resolveOversellFlag(flagId);
+      fetchProducts();
+    } catch (err) {
+      setError(err.message || "Failed to resolve flag");
+    }
+  };
+
   return (
     <div className="space-y-4">
       {error && (
@@ -743,6 +756,51 @@ function CatalogTab() {
             Cancel
           </button>
         </>
+      )}
+
+      {oversells.length > 0 && (
+        <div className="rounded-2xl bg-surface2 border border-danger/30 overflow-hidden">
+          <div className="px-4 py-3 bg-danger/10 border-b border-danger/20">
+            <h3 className="text-danger text-sm font-bold">
+              Oversell flags ({oversells.length})
+            </h3>
+            <p className="text-textMuted text-xs mt-0.5">
+              Pool items sold past recorded stock — usually a counting discrepancy.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <tbody>
+                {oversells.map((flag) => (
+                  <tr key={flag.id} className="border-b border-borderColor last:border-0">
+                    <td className="py-2.5 px-4">
+                      <p className="text-textPrimary font-semibold text-sm">
+                        {flag.display_name || flag.item_name || `Pool #${flag.pool_key || flag.id}`}
+                      </p>
+                      <p className="text-textMuted text-xs">Sale #{flag.sale_id} · {new Date(flag.sale_date).toLocaleString()}</p>
+                    </td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span className="text-danger font-semibold text-sm">{flag.requested}</span>
+                    </td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span className="text-textSecondary text-sm">{flag.available}</span>
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2.5 px-4 text-right">
+                        <button
+                          onClick={() => handleResolveOversell(flag.id)}
+                          title="Mark this oversell as reviewed"
+                          className="px-3 py-1 rounded-lg border border-borderColor bg-surface2 text-textSecondary text-xs font-semibold hover:bg-surface3 hover:text-textPrimary">
+                          Resolve
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       <div className="rounded-2xl bg-surface2 border border-borderColor p-4">
@@ -851,7 +909,8 @@ function GasStockTab({ staffRole }) {
         getOversellFlags(false, activeLocationId),
       ]);
       setStock(stockData);
-      setOversells(oversellData);
+      // Cylinder flags only — butchery pool flags live on the Catalog tab.
+      setOversells((oversellData || []).filter((f) => f.item_type === "cylinder"));
     } catch (err) {
       setError(err.message || "Failed to load stock");
     } finally {
@@ -2281,7 +2340,7 @@ export default function CatalogStockAdmin({ staffRole, initialTab }) {
         </CTabList>
         <CTabContent>
           <CTabPanel className="p-3" itemKey="catalog">
-            {activeTab === "catalog" && <CatalogTab key={`catalog-${tabVisit}`} />}
+            {activeTab === "catalog" && <CatalogTab key={`catalog-${tabVisit}`} staffRole={staffRole} />}
           </CTabPanel>
           <CTabPanel className="p-3" itemKey="gas">
             {activeTab === "gas" && <GasStockTab key={`gas-${tabVisit}`} staffRole={staffRole} />}

@@ -317,9 +317,13 @@ export default function Dashboard({ onNavigate }) {
   const expenses = ledger?.expenses || {};
   const restockExpenses = Number(expenses?.stock || 0) + Number(expenses?.refills || 0);
   const operatingExpenses = Number(expenses?.operating || 0);
-  // Credit sold today that hasn't been collected yet -- shown as negative
-  // since it's money extended, not money in hand.
+  // Credit sold this period that hasn't been collected yet -- shown as
+  // negative since it's money extended, not money in hand.
   const creditBalance = -(income?.creditExtended || 0);
+  // Unpaid credit = outstanding invoice balances (AR), not period-scoped:
+  // a settled invoice must drop this figure to zero even if the sale was
+  // made in the selected period.
+  const unpaidCredit = Number(ar?.totalOutstanding || 0);
   const totalIncome = ledger?.netIncome || 0;
   // Backlog, not a daily flow figure -- a pending payout from days ago is
   // still outstanding today, so this is derived from the full pending list
@@ -345,13 +349,13 @@ export default function Dashboard({ onNavigate }) {
   const flagCount =
     oversells.length +
     lowStock.length +
-    (creditBalance < 0 ? 1 : 0) +
+    (unpaidCredit > 0 ? 1 : 0) +
     (pendingPromoCount > 0 ? 1 : 0) +
     (overdue > 0 ? 1 : 0);
   const flagDetail = [
     oversells.length && `${oversells.length} oversell(s)`,
     lowStock.length && `${lowStock.length} low stock`,
-    creditBalance < 0 && "unpaid credit",
+    unpaidCredit > 0 && "unpaid credit",
     pendingPromoCount > 0 && `${pendingPromoCount} promo payout(s)`,
     overdue > 0 && "overdue invoices",
   ].filter(Boolean).join(" · ");
@@ -524,10 +528,10 @@ export default function Dashboard({ onNavigate }) {
           { label: "Account / credit sales", value: formatKes(account) },
           {
             label: "Unpaid credit",
-            value: formatKes(Math.abs(creditBalance)),
-            subtext: `${income?.creditExtendedCount || 0} credit sale(s) in the selected period, unpaid`,
-            tone: creditBalance < 0 ? "danger" : "default",
-            zero: creditBalance >= 0,
+            value: formatKes(unpaidCredit),
+            subtext: `${income?.creditExtendedCount || 0} credit sale(s) in the selected period`,
+            tone: unpaidCredit > 0 ? "danger" : "default",
+            zero: unpaidCredit <= 0,
           },
           { label: "Top customer in period", value: formatKes(topCustomers[0]?.total_spend || 0), subtext: topCustomers[0]?.name || "No sales yet", zero: !topCustomers[0] },
         ]}

@@ -761,7 +761,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
               <input
                 type="number"
                 min={total}
-                step="1"
+                step="any"
                 value={cashReceived}
                 onChange={(e) => setCashReceived(e.target.value)}
                 placeholder="Enter amount received"

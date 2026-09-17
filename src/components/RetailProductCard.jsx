@@ -9,23 +9,6 @@ const formatKes = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-const PRODUCT_ICONS = {
-  beef: "🥩",
-  goat: "🐐",
-  chicken: "🍗",
-  pork: "🐖",
-  sausage: "🌭",
-};
-
-function getIcon(product) {
-  if (product.business_type === "gas" || product.is_brand) return null;
-  const key = product.name?.toLowerCase() || "";
-  for (const [name, icon] of Object.entries(PRODUCT_ICONS)) {
-    if (key.includes(name)) return icon;
-  }
-  return null;
-}
-
 function stockCue(product) {
   const qty = Number(product.qty_on_hand ?? 0);
   if (qty <= 0) return "empty";
@@ -72,8 +55,6 @@ function RetailProductCard({ product, onToast }) {
     isWeighted ? (initialQuantity * unitPrice).toFixed(2) : "",
   );
   const [isAdding, setIsAdding] = useState(false);
-
-  const icon = getIcon(product);
 
   const isTracked = Boolean(product.pool_key || product.track_stock);
   const isOutOfStock = isTracked && Number(product.qty_on_hand ?? 0) <= 0;
@@ -164,7 +145,7 @@ function RetailProductCard({ product, onToast }) {
   if (isOutOfStock && !canSellWhenEmpty) {
     return (
       <div className="flex flex-col min-w-0 rounded-2xl bg-surface1 border border-dashed border-borderColor p-3 sm:p-4 opacity-60">
-        <h3 className="text-textMuted font-bold text-base truncate">{product.name}</h3>
+        <h3 className="text-textMuted font-bold text-lg truncate">{product.name}</h3>
         <p className="text-textMuted text-sm font-semibold mt-1">{formatKes(unitPrice)}</p>
         <p className="text-danger text-xs font-bold mt-2 uppercase tracking-wide">Out of stock</p>
       </div>
@@ -173,14 +154,8 @@ function RetailProductCard({ product, onToast }) {
 
   return (
     <div className={`group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-3 sm:p-4 shadow-card transition-all duration-200 ${isOutOfStock ? "opacity-60" : "hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong"}`}>
-      {icon && (
-        <div className="flex items-center justify-center h-20 sm:h-28 rounded-xl bg-surface1 border border-borderColor mb-3 sm:mb-4 text-4xl sm:text-5xl">
-          {icon}
-        </div>
-      )}
-
       <div className="mb-2 sm:mb-3 min-w-0">
-        <h3 className="text-textPrimary font-bold text-base truncate">
+        <h3 className="text-textPrimary font-bold text-lg truncate">
           {product.name}
         </h3>
         <p className="text-textPrimary text-lg font-bold mt-1">
