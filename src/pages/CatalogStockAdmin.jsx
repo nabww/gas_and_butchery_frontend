@@ -1912,17 +1912,15 @@ function RefillRequestsTab({ staffRole }) {
 
 const KG_OUTPUTS = [
   ["meat", "Meat & bones"],
-  ["liver", "Liver"],
-  ["kidney", "Kidney"],
-  ["heart", "Heart"],
-  ["tripe", "Tripe"],
-  ["tongue", "Tongue"],
-  ["matumbo", "Matumbo"],
-  ["lungs", "Lungs"],
+  ["organs", "Organs (liver, kidney & heart)"],
+  ["tripe", "Matumbo"],
+  ["matumbo", "Mara"],
 ];
+// Heads, legs, tongue and lungs sell bundled as one set per animal; the hide
+// is a separate piece. Both are priced at slaughter.
 const PIECE_OUTPUTS = [
-  ["heads", "Heads"],
-  ["legs", "Legs"],
+  ["head_set", "Head, legs, tongue & lungs"],
+  ["hide", "Hide"],
 ];
 
 function LivestockTab() {
@@ -2013,7 +2011,7 @@ function LivestockTab() {
     const form = slaughterForm;
     const preview = slaughterPreview(animal);
     if (preview.totalKg <= 0 && preview.pieceOffset <= 0) { setMessage("Record at least one output"); return; }
-    if (preview.remaining < 0) { setMessage("Estimated heads/legs value exceeds the animal cost"); return; }
+    if (preview.remaining < 0) { setMessage("Estimated set/hide value exceeds the animal cost"); return; }
     setSaving(true);
     setMessage("");
     try {
@@ -2083,11 +2081,11 @@ function LivestockTab() {
             </label>
           </div>
           <div className="space-y-2">
-            <label className="text-textMuted text-xs">Extra costs (transport, slaughter fee, etc.) — added to the animal's cost</label>
+            <label className="text-sm font-semibold text-textSecondary">Extra costs (transport, slaughter fee, etc.) — added to the animal's cost</label>
             {extras.map((line, index) => (
               <div key={index} className="flex gap-2">
-                <input className={`${inputClass} flex-1`} placeholder="Description" value={line.description} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, description: e.target.value } : l)))} disabled={saving} />
-                <input className={`${inputClass} w-32`} type="number" min="0" step="0.01" placeholder="Amount" value={line.amount} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, amount: e.target.value } : l)))} disabled={saving} />
+                <input className={`${inputClass} flex-1 min-w-0`} placeholder="Description" value={line.description} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, description: e.target.value } : l)))} disabled={saving} />
+                <input className={`${inputClass} w-24 shrink-0`} type="number" min="0" step="0.01" placeholder="Amount" value={line.amount} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, amount: e.target.value } : l)))} disabled={saving} />
                 <button type="button" onClick={() => setExtras((prev) => prev.filter((_, i) => i !== index))} disabled={saving} className="px-2 py-1 rounded-lg border border-danger/30 text-danger text-xs font-semibold hover:bg-danger/10">×</button>
               </div>
             ))}
@@ -2136,7 +2134,7 @@ function LivestockTab() {
                       <td colSpan={6} className="p-0">
                         <div className="p-3 sm:p-4 bg-surface1 space-y-4">
                           <p className="text-textSecondary text-xs">
-                            Enter the outputs. Heads and legs carry cost equal to their expected sale price; the rest of the KES {Number(animal.total_cost).toLocaleString("en-KE")} cost spreads over the kg outputs.
+                            Enter the outputs. Head/legs sets and hides carry cost equal to their expected sale price; the rest of the KES {Number(animal.total_cost).toLocaleString("en-KE")} cost spreads over the kg outputs.
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {KG_OUTPUTS.map(([key, label]) => (
@@ -2164,7 +2162,7 @@ function LivestockTab() {
                           {preview && (preview.totalKg > 0 || preview.pieceOffset > 0) && (
                             <p className="text-textSecondary text-xs">
                               {preview.totalKg}kg entered → {preview.effectiveKg.toFixed(1)}kg after shrinkage ·
-                              heads/legs offset KES {preview.pieceOffset.toLocaleString("en-KE")} ·
+                              set/hide offset KES {preview.pieceOffset.toLocaleString("en-KE")} ·
                               cost per kg ≈ <span className="font-semibold text-textPrimary">KES {preview.costPerKg.toFixed(2)}</span>
                             </p>
                           )}
