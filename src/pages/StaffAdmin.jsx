@@ -49,6 +49,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
     pin: "",
     can_redeem_points: false,
     can_switch_location: false,
+    receive_stock_alerts: false,
     is_active: true,
   };
 
@@ -70,6 +71,9 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
   );
   const [canSwitchLocation, setCanSwitchLocation] = useState(
     !!defaults.can_switch_location,
+  );
+  const [receiveStockAlerts, setReceiveStockAlerts] = useState(
+    !!defaults.receive_stock_alerts,
   );
   const [isActive, setIsActive] = useState(Boolean(defaults.is_active));
   const [saving, setSaving] = useState(false);
@@ -126,6 +130,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
         module_access: moduleAccess,
         can_redeem_points: canRedeemPoints,
         can_switch_location: canSwitchLocation,
+        receive_stock_alerts: receiveStockAlerts,
         is_active: isActive,
       };
 
@@ -252,6 +257,17 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
               Can switch shops
             </label>
           )}
+          <label
+            className="flex items-center gap-2 text-xs text-textSecondary"
+            title={!phone.trim() ? "Set a phone number — alerts send by SMS" : undefined}>
+            <input
+              type="checkbox"
+              checked={receiveStockAlerts}
+              onChange={(e) => setReceiveStockAlerts(e.target.checked)}
+              disabled={!phone.trim()}
+            />
+            Low-stock SMS alerts
+          </label>
         </div>
       </div>
 
