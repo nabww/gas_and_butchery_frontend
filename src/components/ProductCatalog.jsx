@@ -181,8 +181,11 @@ export default function ProductCatalog({
             type="button"
             onClick={handleRefresh}
             disabled={loading}
-            className="px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors whitespace-nowrap">
-            {loading ? "Refreshing…" : "↻ Refresh stock"}
+            aria-label="Refresh stock"
+            title="Refresh stock"
+            className="px-3 sm:px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors whitespace-nowrap shrink-0">
+            <span aria-hidden="true" className={loading ? "inline-block animate-spin" : ""}>↻</span>
+            <span className="hidden sm:inline">{loading ? " Refreshing…" : " Refresh stock"}</span>
           </button>
         </div>
       </div>
