@@ -285,13 +285,22 @@ button.till-bottom-bar:focus-visible {
 
 /* Responsive breakpoints */
 @media (max-width: 1023px) {
+  /* Tablet landscape (~600–1020px CSS): keep both panes visible, but give
+     the cart pane a floor of 340px so the payment keypad and checkout
+     buttons stay touchable, and tighten the desktop 20px section padding. */
   .left-pane {
-    flex: 0 0 60%;
+    flex: 1 1 0;
   }
 
   .right-pane {
-    flex: 0 0 40%;
-    min-width: 280px;
+    flex: 0 0 max(42%, 340px);
+    min-width: unset;
+    max-width: 460px;
+  }
+
+  .right-section,
+  .till-actions {
+    padding: 14px 16px;
   }
 }
 
