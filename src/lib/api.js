@@ -57,20 +57,27 @@ export async function login(pin) {
   };
 
   let res;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin }),
+      signal: controller.signal,
     });
   } catch (networkErr) {
-    // Server unreachable — try offline credential cache
     const offline = await tryOfflineFallback();
     if (offline) return offline;
+    if (networkErr.name === "AbortError") {
+      throw new Error("Login timed out. Check that this device can reach the TeziPOS server.");
+    }
     throw new Error(
       "Cannot reach server and no cached credentials found for this PIN. " +
       "Sign in online first to enable offline access."
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   let data = null;

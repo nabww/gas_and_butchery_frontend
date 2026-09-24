@@ -506,73 +506,98 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         </div>
       )}
 
-      {/* Mobile menu overlay */}
+      {/* Mobile menu drawer */}
       {mobileOpen && (
         <div
+          role="presentation"
+          onClick={() => setMobileOpen(false)}
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: 'var(--surface-2)',
-            borderBottom: '0.5px solid var(--border)',
-            padding: '12px 16px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            zIndex: 99,
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 2000,
           }}
         >
-          <div className="space-y-2 mb-4">
-            {items.map((item) => (
-              <NavItem
-                key={item.path}
-                item={item}
-                currentPath={currentPath}
-                onClick={() => handleNav(item.path)}
-                onBadgeClick={() => handleNav('/catalog?tab=refill-requests')}
-                mobile
-                badge={item.path === '/catalog' ? refillWaiting : 0}
-              />
-            ))}
-          </div>
-
-          {showLocationSwitcher && switchableLocations.length > 0 && (
-            <div className="pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-              <LocationSwitcher
-                locations={switchableLocations}
-                activeLocationId={activeLocationId}
-                onChange={(id) => {
-                  setMobileOpen(false);
-                  setActiveLocationId(id);
-                }}
-              />
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-4">
-            {showQuickSell && currentPath !== '/till' && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(82vw, 320px)',
+              height: '100%',
+              background: 'var(--surface-2)',
+              borderRight: '0.5px solid var(--border)',
+              padding: '16px',
+              boxShadow: '8px 0 24px rgba(0,0,0,0.2)',
+              overflowY: 'auto',
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <strong style={{ color: 'var(--text-primary)', fontSize: 15 }}>Menu</strong>
               <button
-                onClick={() => handleNav('/till')}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: 'var(--text-accent)',
-                  fontSize: 13,
-                  textDecoration: 'underline',
-                }}
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close navigation"
+                style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 24, lineHeight: 1, padding: 4 }}
               >
-                Sell
+                ×
               </button>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              {items.map((item) => (
+                <NavItem
+                  key={item.path}
+                  item={item}
+                  currentPath={currentPath}
+                  onClick={() => handleNav(item.path)}
+                  onBadgeClick={() => handleNav('/catalog?tab=refill-requests')}
+                  mobile
+                  badge={item.path === '/catalog' ? refillWaiting : 0}
+                />
+              ))}
+            </div>
+
+            {showLocationSwitcher && switchableLocations.length > 0 && (
+              <div className="pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <LocationSwitcher
+                  locations={switchableLocations}
+                  activeLocationId={activeLocationId}
+                  onChange={(id) => {
+                    setMobileOpen(false);
+                    setActiveLocationId(id);
+                  }}
+                />
+              </div>
             )}
-            <button
-              onClick={toggleTheme}
-              style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}
-            >
-              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-            </button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
-            <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}>
-              Sign out
-            </button>
+
+            <div className="flex flex-col items-start gap-4">
+              {showQuickSell && currentPath !== '/till' && (
+                <button
+                  onClick={() => handleNav('/till')}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: 'var(--text-accent)',
+                    fontSize: 13,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Sell
+                </button>
+              )}
+              <button
+                onClick={toggleTheme}
+                style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}
+              >
+                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
+              <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}>
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       )}

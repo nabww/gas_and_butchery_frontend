@@ -46,9 +46,9 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 p-3 rounded-xl bg-surface1 border border-borderColor">
-      <div className="flex-1 min-w-0 w-full">
-        <p className="text-textPrimary font-semibold text-sm truncate">
+    <div className="flex flex-col gap-2 p-3 min-w-0 rounded-xl bg-surface1 border border-borderColor">
+      <div className="min-w-0 w-full">
+        <p className="text-textPrimary font-semibold text-sm truncate" title={item.product_name}>
           {item.product_name}
         </p>
         <p className="text-textMuted text-xs mt-0.5">
@@ -56,7 +56,7 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
         </p>
       </div>
 
-      <div className="flex items-center justify-between lg:justify-end gap-3 shrink-0 w-full lg:w-auto">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_2rem] items-center gap-2 w-full min-w-0">
         <QuantityStepper
           value={item.quantity}
           onChange={handleQtyChange}
@@ -64,15 +64,14 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
           step={item.pricing_type === "weighted" ? 0.1 : 1}
           size="sm"
         />
-        <div className="text-right min-w-[72px]">
-          <p className="text-textPrimary font-bold text-sm">
-            {formatKes(item.line_total)}
-          </p>
-        </div>
+        <p className="text-textPrimary font-bold text-sm text-right truncate">
+          {formatKes(item.line_total)}
+        </p>
         <button
           onClick={handleRemove}
           title="Remove item"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors text-sm">
+          aria-label={`Remove ${item.product_name}`}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors text-sm shrink-0">
           ✕
         </button>
       </div>

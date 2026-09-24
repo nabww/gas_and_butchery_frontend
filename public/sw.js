@@ -6,7 +6,7 @@
 // Bump this on any change to the caching strategy below -- the activate
 // handler purges any cache whose name doesn't match, which is what
 // clears out a stale shell after a deploy.
-const CACHE_NAME = 'tezipos-shell-v2';
+const CACHE_NAME = 'tezipos-shell-v3';
 
 self.addEventListener('install', (event) => {
   // Nothing to precache -- index.html and hashed assets are cached
