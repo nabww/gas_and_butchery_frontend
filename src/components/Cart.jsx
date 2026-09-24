@@ -56,7 +56,7 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_2rem] items-center gap-2 w-full min-w-0">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 w-full min-w-0">
         <QuantityStepper
           value={item.quantity}
           onChange={handleQtyChange}
@@ -64,16 +64,18 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
           step={item.pricing_type === "weighted" ? 0.1 : 1}
           size="sm"
         />
-        <p className="text-textPrimary font-bold text-sm text-right truncate">
-          {formatKes(item.line_total)}
-        </p>
-        <button
-          onClick={handleRemove}
-          title="Remove item"
-          aria-label={`Remove ${item.product_name}`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors text-sm shrink-0">
-          ✕
-        </button>
+        <div className="flex flex-col items-end gap-1 min-w-0">
+          <p className="text-textPrimary font-bold text-sm text-right whitespace-nowrap">
+            {formatKes(item.line_total)}
+          </p>
+          <button
+            onClick={handleRemove}
+            title="Remove item"
+            aria-label={`Remove ${item.product_name}`}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors text-sm shrink-0">
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   );
