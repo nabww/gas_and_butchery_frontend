@@ -524,12 +524,16 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             aria-label="Navigation menu"
             onClick={(event) => event.stopPropagation()}
             style={{
+              position: 'absolute',
+              top: (navRef.current?.getBoundingClientRect().bottom || 72) + 6,
+              right: 8,
               width: 'min(82vw, 320px)',
-              height: '100%',
+              maxHeight: `calc(100vh - ${(navRef.current?.getBoundingClientRect().bottom || 72) + 14}px)`,
               background: 'var(--surface-2)',
-              borderRight: '0.5px solid var(--border)',
+              border: '0.5px solid var(--border)',
+              borderRadius: 12,
               padding: '16px',
-              boxShadow: '8px 0 24px rgba(0,0,0,0.2)',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
               overflowY: 'auto',
             }}
           >
