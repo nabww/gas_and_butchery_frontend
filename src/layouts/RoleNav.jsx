@@ -333,6 +333,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           gap: 8,
           width: '100%',
           overflow: 'visible',
+          position: 'relative',
         }}
       >
         <button
@@ -362,6 +363,16 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             businessConfig?.business_name || 'TeziPOS'
           )}
         </button>
+
+        {collapsed && showLocationSwitcher && switchableLocations.length > 0 && (
+          <div className="hidden sm:block absolute left-1/2 -translate-x-1/2">
+            <LocationSwitcher
+              locations={switchableLocations}
+              activeLocationId={activeLocationId}
+              onChange={setActiveLocationId}
+            />
+          </div>
+        )}
 
         {/* Desktop nav links */}
         <div className={collapsed ? 'hidden' : 'flex items-center gap-1'}>
@@ -513,7 +524,10 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           onClick={() => setMobileOpen(false)}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: navRef.current?.getBoundingClientRect().bottom || 72,
+            right: 0,
+            bottom: 0,
+            left: 0,
             background: 'rgba(0,0,0,0.45)',
             zIndex: 2000,
           }}
@@ -525,30 +539,17 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             onClick={(event) => event.stopPropagation()}
             style={{
               position: 'absolute',
-              top: (navRef.current?.getBoundingClientRect().bottom || 72) + 6,
-              right: 8,
+              top: 0,
+              right: 0,
               width: 'min(82vw, 320px)',
-              maxHeight: `calc(100vh - ${(navRef.current?.getBoundingClientRect().bottom || 72) + 14}px)`,
+              height: '100%',
               background: 'var(--surface-2)',
-              border: '0.5px solid var(--border)',
-              borderRadius: 12,
+              borderLeft: '0.5px solid var(--border)',
               padding: '16px',
-              boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+              boxShadow: '-8px 0 24px rgba(0,0,0,0.2)',
               overflowY: 'auto',
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <strong style={{ color: 'var(--text-primary)', fontSize: 15 }}>Menu</strong>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                aria-label="Close navigation"
-                style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 24, lineHeight: 1, padding: 4 }}
-              >
-                ×
-              </button>
-            </div>
-
             <div className="space-y-2 mb-4">
               {items.map((item) => (
                 <NavItem
@@ -564,7 +565,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             </div>
 
             {showLocationSwitcher && switchableLocations.length > 0 && (
-              <div className="pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
+              <div className="sm:hidden pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
                 <LocationSwitcher
                   locations={switchableLocations}
                   activeLocationId={activeLocationId}
