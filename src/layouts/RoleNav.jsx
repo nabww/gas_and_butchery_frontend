@@ -448,6 +448,21 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         <div className={collapsed ? 'flex items-center gap-1' : 'hidden'}>
           <button
             type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              padding: 6,
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+            aria-label="Toggle navigation"
+          >
+            <HamburgerIcon open={mobileOpen} />
+          </button>
+          <button
+            type="button"
             onClick={onSignOut}
             title="Sign out"
             aria-label="Sign out"
@@ -465,21 +480,6 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             }}
           >
             <PowerIcon />
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              padding: 6,
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
-            aria-label="Toggle navigation"
-          >
-            <HamburgerIcon open={mobileOpen} />
           </button>
         </div>
       </div>
