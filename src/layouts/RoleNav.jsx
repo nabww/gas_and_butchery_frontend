@@ -14,6 +14,15 @@ function HamburgerIcon({ open }) {
   );
 }
 
+function PowerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M10 2v7" />
+      <path d="M6.1 5.2a7 7 0 1 0 7.8 0" />
+    </svg>
+  );
+}
+
 // Shop switcher — admins can always switch shops; a supervisor only sees
 // this if explicitly granted `can_switch_location` (per-staff override,
 // same pattern as can_redeem_points). Cashiers never see it.
@@ -435,23 +444,44 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           </button>
         </div>
 
-        {/* Mobile hamburger toggle */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          className={collapsed ? 'block' : 'hidden'}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            padding: 6,
-            borderRadius: 6,
-            cursor: 'pointer',
-          }}
-          aria-label="Toggle navigation"
-        >
-          <HamburgerIcon open={mobileOpen} />
-        </button>
+        {/* Mobile controls */}
+        <div className={collapsed ? 'flex items-center gap-1' : 'hidden'}>
+          <button
+            type="button"
+            onClick={onSignOut}
+            title="Sign out"
+            aria-label="Sign out"
+            style={{
+              border: '0.5px solid var(--border)',
+              background: 'var(--surface-1)',
+              color: 'var(--danger, #e55353)',
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <PowerIcon />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              padding: 6,
+              borderRadius: 6,
+              cursor: 'pointer',
+            }}
+            aria-label="Toggle navigation"
+          >
+            <HamburgerIcon open={mobileOpen} />
+          </button>
+        </div>
       </div>
 
       {/* Requesting-shop confirmation: their refill request was fulfilled. */}
