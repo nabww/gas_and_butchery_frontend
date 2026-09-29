@@ -4,9 +4,9 @@ import { useActiveLocation } from '../contexts/LocationContext';
 import { MODULE_CATALOG, effectiveModules } from '../lib/modules';
 import { getBusinessConfig, listRefillRequests } from '../lib/api';
 
-function HamburgerIcon({ open }) {
+function HamburgerIcon({ open, size = 20 }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <line x1={open ? 3 : 2} y1="5" x2={open ? 17 : 18} y2={open ? 15 : 5} />
       <line x1="2" y1="10" x2="18" y2="10" style={{ opacity: open ? 0 : 1, transition: 'opacity 0.15s' }} />
       <line x1={open ? 3 : 2} y1="15" x2={open ? 17 : 18} y2={open ? 5 : 15} />
@@ -445,7 +445,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         </div>
 
         {/* Mobile controls */}
-        <div className={collapsed ? 'flex items-center gap-1' : 'hidden'}>
+        <div className={collapsed ? 'flex items-center gap-2' : 'hidden'}>
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
@@ -456,10 +456,15 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               padding: 6,
               borderRadius: 6,
               cursor: 'pointer',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             aria-label="Toggle navigation"
           >
-            <HamburgerIcon open={mobileOpen} />
+            <HamburgerIcon open={mobileOpen} size={22} />
           </button>
           <button
             type="button"
