@@ -325,6 +325,8 @@ export default function Dashboard({ onNavigate }) {
   // made in the selected period.
   const unpaidCredit = Number(ar?.totalOutstanding || 0);
   const totalIncome = ledger?.netIncome || 0;
+  const invoicePaymentsReceived = Number(income?.invoicePaymentsReceived || 0);
+  const invoicePaymentsReceivedCount = Number(income?.invoicePaymentsReceivedCount || 0);
   // Backlog, not a daily flow figure -- a pending payout from days ago is
   // still outstanding today, so this is derived from the full pending list
   // (same data backing the "Pending rewards & cashback" section below)
@@ -509,7 +511,9 @@ export default function Dashboard({ onNavigate }) {
         <HeroCard
           label="Net cash"
           value={formatKes(totalIncome)}
-          subtext="Collected income less recorded costs for this period"
+          subtext={invoicePaymentsReceivedCount > 0
+            ? `Includes ${formatKes(invoicePaymentsReceived)} from ${invoicePaymentsReceivedCount} invoice payment(s)`
+            : "Collected income less recorded costs for this period"}
           tone={totalIncome > 0 ? "success" : totalIncome < 0 ? "danger" : "default"}
         />
         <HeroCard

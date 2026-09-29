@@ -47,9 +47,9 @@ function png(size, draw) {
 function render(size) {
   const S = size * 4;
   const at = (fx, fy) => {
-    // "T": top bar + stem, centered in the 80% safe zone.
-    const inBar = fx > 0.20 && fx < 0.80 && fy > 0.24 && fy < 0.44;
-    const inStem = fx > 0.41 && fx < 0.59 && fy > 0.44 && fy < 0.78;
+    // "T": top bar + stem, centered in the 60% safe zone.
+    const inBar = fx > 0.30 && fx < 0.70 && fy > 0.28 && fy < 0.44;
+    const inStem = fx > 0.44 && fx < 0.56 && fy > 0.44 && fy < 0.74;
     return inBar || inStem ? [255, 255, 255, 255] : [0x7c, 0x3a, 0xed, 255];
   };
   const out = png(size, (fx, fy) => {
