@@ -1956,7 +1956,7 @@ function LivestockTab() {
     setExpandedId(animal.id);
     if (!details[animal.id]) {
       try {
-        const detail = await getAnimalPurchase(animal.id);
+        const detail = await getAnimalPurchase(animal.id, activeLocationId);
         setDetails((prev) => ({ ...prev, [animal.id]: detail }));
       } catch (err) {
         setMessage(err.message || "Failed to load detail");

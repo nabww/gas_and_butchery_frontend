@@ -39,14 +39,14 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white text-slate-900 shadow-2xl border border-slate-200 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-2xl bg-surface1 text-textPrimary shadow-2xl border border-borderColor p-5">
         <div className="text-center mb-4">
           <div className="text-4xl mb-2">🎉</div>
-          <h3 className="text-lg font-bold text-slate-900">
+          <h3 className="text-lg font-bold text-textPrimary">
             Congratulations {customerName || "Customer"}!
           </h3>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-sm text-textSecondary mt-1">
             This sale has {wins.length} promo win{wins.length > 1 ? "s" : ""}.
           </p>
         </div>
@@ -55,8 +55,8 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
           {wins.map((win) => (
             <div
               key={win.id}
-              className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="font-semibold text-sm text-slate-900">
+              className="rounded-xl border border-borderColor bg-surface2 p-3">
+              <p className="font-semibold text-sm text-textPrimary">
                 {win.type === "cashback"
                   ? `Cashback: ${formatKes(win.cashback_amount)}`
                   : `Prize: ${win.reward?.name || "a reward"}`}
@@ -70,7 +70,7 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
                   className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
                     decisions[win.id] === "issued"
                       ? "bg-primary text-onPrimary border-primary"
-                      : "bg-white text-textSecondary border-borderColor hover:bg-surface3"
+                      : "bg-surface1 text-textSecondary border-borderColor hover:bg-surface3 hover:text-textPrimary"
                   }`}>
                   Issue now
                 </button>
@@ -82,7 +82,7 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
                   className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
                     decisions[win.id] === "pending"
                       ? "bg-warning text-white border-warning"
-                      : "bg-white text-textSecondary border-borderColor hover:bg-surface3"
+                      : "bg-surface1 text-textSecondary border-borderColor hover:bg-surface3 hover:text-textPrimary"
                   }`}>
                   Leave pending
                 </button>
@@ -93,7 +93,7 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
 
         {hasIssued && (
           <div className="mb-4">
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-textSecondary mb-1">
               Supervisor / admin PIN
             </label>
             <input
@@ -103,7 +103,7 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="Enter 6-digit PIN"
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-300 text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-primary text-sm"
+              className="w-full px-3 py-2.5 rounded-xl bg-surface2 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary text-sm"
             />
           </div>
         )}

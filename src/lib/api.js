@@ -661,8 +661,11 @@ export async function listAnimalPurchases(locationId, status = null) {
   return apiFetch(`/expenses/animal-purchases${suffix ? `?${suffix}` : ""}`);
 }
 
-export async function getAnimalPurchase(purchaseId) {
-  return apiFetch(`/expenses/animal-purchases/${purchaseId}`);
+export async function getAnimalPurchase(purchaseId, locationId = null) {
+  const query = new URLSearchParams();
+  if (locationId) query.set("location_id", locationId);
+  const suffix = query.toString();
+  return apiFetch(`/expenses/animal-purchases/${purchaseId}${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function createAnimalPurchase(payload) {
