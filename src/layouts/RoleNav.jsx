@@ -366,6 +366,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             <img
               src={businessConfig.business_logo_url}
               alt={businessConfig?.business_name || 'TeziPOS'}
+              className="business-logo-adaptive"
               style={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
             />
           ) : (

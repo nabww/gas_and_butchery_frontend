@@ -2015,7 +2015,7 @@ function LivestockTab() {
     setSaving(true);
     setMessage("");
     try {
-      const payload = { shrinkage_pct: slaughterValue(form, "shrinkage_pct") };
+      const payload = { shrinkage_pct: slaughterValue(form, "shrinkage_pct"), location_id: activeLocationId };
       for (const [key] of KG_OUTPUTS) payload[`${key}_kg`] = slaughterValue(form, `${key}_kg`);
       for (const [key] of PIECE_OUTPUTS) {
         payload[`${key}_count`] = slaughterValue(form, `${key}_count`);

@@ -155,7 +155,7 @@ function BusinessConfigSection({ message, setMessage }) {
               <img
                 src={config.business_logo_url}
                 alt="Logo preview"
-                className="h-full w-full object-contain"
+                className="h-full w-full object-contain business-logo-adaptive"
               />
             ) : (
               <span className="text-textMuted text-xs">None</span>

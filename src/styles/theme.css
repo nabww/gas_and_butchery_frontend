@@ -207,3 +207,21 @@ button[aria-busy='true'],
 @media (prefers-reduced-motion: reduce) {
   .login-wiggle { animation: none; }
 }
+
+/* Business logo presentation across themes.
+   In dark mode, logos with dark/black text are inverted to light text
+   while preserving hues (e.g. orange/purple brand accents). */
+.business-logo {
+  transition: filter 200ms ease;
+}
+
+[data-theme='dark'] .business-logo {
+  filter: brightness(0) invert(1);
+}
+
+/* For multi-colored logos where non-black colored accents should stay intact,
+   .business-logo-adaptive inverts luminosity with hue-rotate compensation */
+[data-theme='dark'] .business-logo-adaptive {
+  filter: invert(0.92) hue-rotate(180deg) brightness(1.1) contrast(1.1);
+}
+

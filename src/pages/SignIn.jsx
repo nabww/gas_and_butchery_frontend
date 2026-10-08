@@ -100,6 +100,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
           <img
             src={businessConfig.business_logo_url}
             alt={businessConfig?.business_name || businessName}
+            className="business-logo-adaptive"
             style={{
               maxHeight: 80,
               maxWidth: '100%',
