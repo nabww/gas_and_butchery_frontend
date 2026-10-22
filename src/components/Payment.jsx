@@ -55,6 +55,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
   const [mpesaSuccess, setMpesaSuccess] = useState(false);
   const mpesaSuccessTimeoutRef = useRef(null);
   const mpesaPollRef = useRef(null);
+  const resetTimerRef = useRef(null);
 
   const stopMpesaPolling = () => {
     if (mpesaPollRef.current) {
@@ -63,7 +64,31 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     }
   };
 
-  useEffect(() => stopMpesaPolling, []);
+  // Single tracked timer for the post-sale "show receipt, then clear the
+  // till" step, so repeated sales never stack timers.
+  const scheduleReset = (delay = 3000) => {
+    clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      resetTimerRef.current = null;
+      resetCart();
+      setShowReceipt(false);
+      setReceipt("");
+      setPromoMessage("");
+      setMpesaSuccess(false);
+      onSaleCompleted?.();
+    }, delay);
+  };
+
+  // On unmount: stop polling and clear timers. A pending reset still clears
+  // the shared cart so a completed sale isn't left in it after navigating away.
+  useEffect(() => () => {
+    stopMpesaPolling();
+    clearTimeout(mpesaSuccessTimeoutRef.current);
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetCart();
+    }
+  }, []);
 
 
 
@@ -230,13 +255,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
           const receiptText = await getSaleReceipt(realSaleId);
           setReceipt(receiptText);
           setShowReceipt(true);
-          setTimeout(() => {
-            resetCart();
-            setShowReceipt(false);
-            setReceipt("");
-            setPromoMessage("");
-            onSaleCompleted?.();
-          }, 3000);
+          scheduleReset();
         }
         setLoading(false);
         return;
@@ -281,25 +300,13 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
           }
           setReceipt(receiptText);
           setShowReceipt(true);
-          setTimeout(() => {
-            resetCart();
-            setShowReceipt(false);
-            setReceipt("");
-            setPromoMessage("");
-            onSaleCompleted?.();
-          }, syncResult ? 3000 : 1000);
+          scheduleReset(syncResult ? 3000 : 1000);
         }
       } else {
         setPendingReceiptLocalId(saleLocalId);
         setReceipt("Receipt will print after sync.");
         setShowReceipt(true);
-        setTimeout(() => {
-          resetCart();
-          setShowReceipt(false);
-          setReceipt("");
-          setPromoMessage("");
-          onSaleCompleted?.();
-        }, 1000);
+        scheduleReset(1000);
       }
 
     } catch (err) {
@@ -384,15 +391,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
       }
       setMpesaTransaction(null);
       setMpesaStatus(null);
-      if (!promo?.wins?.length) {
-        setTimeout(() => {
-          resetCart();
-          setShowReceipt(false);
-          setReceipt("");
-          setPromoMessage("");
-          onSaleCompleted?.();
-        }, 3000);
-      }
+      if (!promoWins?.length) scheduleReset();
     } catch (err) {
       setError(err.message || "Failed to finalize M-Pesa payment");
     } finally {
@@ -462,13 +461,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     setShowReceipt(true);
     setPendingAccountCharge(null);
     setApprovalPin("");
-    setTimeout(() => {
-      resetCart();
-      setShowReceipt(false);
-      setReceipt("");
-      setPromoMessage("");
-      onSaleCompleted?.();
-    }, 3000);
+    scheduleReset();
     setApprovalLoading(false);
   };
 
@@ -486,14 +479,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
         setReceipt(receiptText);
         setMpesaSuccess(paymentMethod === "mpesa");
         setShowReceipt(true);
-        setTimeout(() => {
-          resetCart();
-          setShowReceipt(false);
-          setReceipt("");
-          setPromoMessage("");
-          setMpesaSuccess(false);
-          onSaleCompleted?.();
-        }, 3000);
+        scheduleReset();
       });
   };
 
@@ -532,14 +518,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     setMpesaSuccess(paymentMethod === "mpesa");
     setShowReceipt(true);
     setReceiptSaleId(null);
-    setTimeout(() => {
-      resetCart();
-      setShowReceipt(false);
-      setReceipt("");
-      setPromoMessage("");
-      setMpesaSuccess(false);
-      onSaleCompleted?.();
-    }, 3000);
+    scheduleReset();
   };
 
   const handlePrintReceipt = () => printReceipt(receipt);

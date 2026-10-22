@@ -34,6 +34,7 @@ import CylinderBrandForm from "../components/CylinderBrandForm";
 import GasRestockForm from "../components/GasRestockForm";
 import ProductRestockForm from "../components/ProductRestockForm";
 import { useActiveLocation } from "../contexts/LocationContext";
+import { useToast } from "../lib/useToast";
 
 const businessOptions = ["butchery", "accessory"];
 const inputClass =
@@ -897,7 +898,7 @@ function GasStockTab({ staffRole }) {
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  const { toast, showToast, toastRef } = useToast();
   const isAdmin = staffRole === "admin";
 
   const loadStock = useCallback(async () => {
@@ -921,11 +922,6 @@ function GasStockTab({ staffRole }) {
   useEffect(() => {
     loadStock();
   }, [loadStock]);
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 3000);
-  };
 
   const handleResolveOversell = async (flagId) => {
     try {
@@ -983,7 +979,7 @@ function GasStockTab({ staffRole }) {
   return (
     <div className="space-y-4">
       {toast && (
-        <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-success text-sm font-medium">
+        <div ref={toastRef} className="p-3 rounded-xl bg-success/10 border border-success/20 text-success text-sm font-medium">
           {toast}
         </div>
       )}

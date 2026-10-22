@@ -42,7 +42,6 @@ export async function loadProducts(businessType = null, locationId) {
       return getCachedProducts(businessType);
     }
   }
-  console.warn("Offline: loading cached products");
   return getCachedProducts(businessType);
 }
 

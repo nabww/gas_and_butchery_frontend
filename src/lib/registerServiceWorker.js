@@ -10,10 +10,12 @@ export function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener('load', () => {
+  const register = () =>
     navigator.serviceWorker
       .register('/sw.js')
-      .then((reg) => console.log('Service worker registered:', reg.scope))
       .catch((err) => console.error('Service worker registration failed:', err));
-  });
+
+  // Called from an effect, which can run after `load` has already fired.
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
 }

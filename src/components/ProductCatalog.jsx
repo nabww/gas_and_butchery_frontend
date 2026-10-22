@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   loadProducts as loadCachedProducts,
   refreshProductCache,
   refreshCylinderBrandCache,
   loadCylinderBrands,
 } from "../lib/cache/catalogCache";
+import { useToast } from "../lib/useToast";
 import GasProductCard from "./GasProductCard";
 import RetailProductCard from "./RetailProductCard";
 import CategoryPills from "./CategoryPills";
@@ -24,7 +25,7 @@ export default function ProductCatalog({
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  const { toast, showToast, toastRef } = useToast();
   const [search, setSearch] = useState("");
   const [allBrands, setAllBrands] = useState([]);
   const isFirstLoad = useRef(true);
@@ -117,11 +118,6 @@ export default function ProductCatalog({
     }
   };
 
-  const showToast = useCallback((message) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 3000);
-  }, []);
-
   const filteredProducts = useMemo(() => {
     // Pool products only exist on the till once their pool has actually been
     // stocked here (slaughter recorded → pool row exists → pool_unit set).
@@ -192,7 +188,7 @@ export default function ProductCatalog({
 
       {/* Alerts */}
       {toast && (
-        <div className="mx-5 mt-4 p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-sm font-semibold" role="alert">
+        <div ref={toastRef} className="mx-5 mt-4 p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-sm font-semibold" role="alert">
           {toast}
         </div>
       )}

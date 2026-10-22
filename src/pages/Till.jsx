@@ -5,7 +5,7 @@ import {
   discardCurrentDraft,
   getPendingSaleSnapshot,
 } from "../lib/db/syncQueue";
-import { getStoredStaff, checkBackendReachable } from "../lib/api";
+import { getStoredStaff } from "../lib/api";
 import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
 import { setOfflineSalesEnabled } from "../lib/settings";
@@ -16,35 +16,6 @@ import CustomerSelector from "../components/CustomerSelector";
 import Payment from "../components/Payment";
 import "../styles/till.css";
 
-function useBackendOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    let polling = false;
-    const runCheck = async () => {
-      if (polling) return;
-      polling = true;
-      const ok = await checkBackendReachable();
-      if (!cancelled) {
-        setIsOnline(ok);
-      }
-      polling = false;
-    };
-    runCheck();
-    const id = setInterval(runCheck, 5000);
-    const onNetChange = () => runCheck();
-    window.addEventListener("online", onNetChange);
-    window.addEventListener("offline", onNetChange);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      window.removeEventListener("online", onNetChange);
-      window.removeEventListener("offline", onNetChange);
-    };
-  }, []);
-  return isOnline;
-}
-
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
 let cartClearedForPageLoad = false;
 
@@ -54,8 +25,8 @@ const formatKes = (amount) =>
     maximumFractionDigits: 2,
   })}`;
 
-export default function Till({ staff, onNavigate }) {
-  const isOnline = useBackendOnlineStatus();
+// isOnline comes from App's single backend reachability probe.
+export default function Till({ staff, onNavigate, isOnline = true }) {
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const prevOnlineRef = useRef(true);
 

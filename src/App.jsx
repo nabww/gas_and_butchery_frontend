@@ -64,7 +64,7 @@ export default function App() {
     registerServiceWorker();
 
     const syncIfOnline = () => {
-      if (navigator.onLine) {
+      if (navigator.onLine && !document.hidden) {
         syncPendingSales()
           .then((result) => {
             // Synced offline sales only deduct stock on the server once sync
@@ -83,15 +83,17 @@ export default function App() {
     };
 
     window.addEventListener("online", syncIfOnline);
+    document.addEventListener("visibilitychange", syncIfOnline);
     // Also attempt once on app load in case local sales were left from a previous session.
     syncIfOnline();
 
     // Browser online events are unreliable when only the backend becomes reachable.
-    // Poll every 10 seconds while the app is open to pick up reconnections.
+    // Poll every 10 seconds while the app is visible to pick up reconnections.
     const interval = setInterval(syncIfOnline, 10000);
 
     return () => {
       window.removeEventListener("online", syncIfOnline);
+      document.removeEventListener("visibilitychange", syncIfOnline);
       clearInterval(interval);
     };
   }, []);
@@ -101,7 +103,8 @@ export default function App() {
     let cancelled = false;
     let polling = false;
     const runCheck = async () => {
-      if (polling) return;
+      // Skip while hidden (backgrounded tab/PWA) -- re-checked on return.
+      if (polling || document.hidden) return;
       polling = true;
       const ok = await checkBackendReachable();
       if (!cancelled) setIsOnline(ok);
@@ -109,14 +112,15 @@ export default function App() {
     };
     runCheck();
     const id = setInterval(runCheck, 5000);
-    const onNetChange = () => runCheck();
-    window.addEventListener("online", onNetChange);
-    window.addEventListener("offline", onNetChange);
+    window.addEventListener("online", runCheck);
+    window.addEventListener("offline", runCheck);
+    document.addEventListener("visibilitychange", runCheck);
     return () => {
       cancelled = true;
       clearInterval(id);
-      window.removeEventListener("online", onNetChange);
-      window.removeEventListener("offline", onNetChange);
+      window.removeEventListener("online", runCheck);
+      window.removeEventListener("offline", runCheck);
+      document.removeEventListener("visibilitychange", runCheck);
     };
   }, []);
 
@@ -165,7 +169,7 @@ export default function App() {
           onSignOut={handleSignOut}
         />
         {currentPath === "/till" ? (
-          <Till staff={staff} onNavigate={setPath} />
+          <Till staff={staff} onNavigate={setPath} isOnline={isOnline} />
         ) : currentPath === "/customers" ? (
           <CustomersAdmin staffRole={staff.role} />
         ) : currentPath === "/stock" || currentPath?.startsWith("/catalog") ? (
