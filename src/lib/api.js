@@ -253,6 +253,18 @@ export async function getM2pesaStatus(mpesaTransactionId) {
   return apiFetch(`/payments/mpesa/status/${mpesaTransactionId}`);
 }
 
+export async function authorizeAccountSale(corporateAccountId, saleLocalId, saleTotal, approvalPin, locationId) {
+  return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-check`, {
+    method: "POST",
+    body: JSON.stringify({
+      sale_local_id: saleLocalId,
+      sale_total: saleTotal,
+      approval_pin: approvalPin || undefined,
+      location_id: locationId,
+    }),
+  });
+}
+
 export async function linkM2pesaToSale(mpesaTransactionId, saleId) {
   return apiFetch("/payments/mpesa/link", {
     method: "POST",

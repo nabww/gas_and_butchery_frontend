@@ -4,12 +4,11 @@ import {
   getM2pesaStatus,
   linkM2pesaToSale,
   getSaleReceipt,
-  completeAccountSale,
-  verifyApprovalPin,
+  authorizeAccountSale,
   approvePromoPayout,
 } from "../lib/api";
-import { recordCashSale, recordMpesaSale, recordAccountSale } from "../lib/saleOperations";
-import { syncPendingSales } from "../lib/db/syncQueue";
+import { recordCashSale, recordMpesaSale } from "../lib/saleOperations";
+import { syncPendingSales, syncAuthorizedAccountSale, getPendingSaleSnapshot } from "../lib/db/syncQueue";
 import { isOfflineSalesEnabled } from "../lib/settings";
 import { printReceipt } from "../lib/receipt";
 import { useCart } from "../contexts/CartContext";
@@ -161,6 +160,33 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     return null;
   }
 
+  const requestAccountAuthorization = async (pin) => {
+    const draft = await getPendingSaleSnapshot(saleLocalId);
+    if (!draft) throw new Error("No active sale");
+    return authorizeAccountSale(customer.corporate_account_id, saleLocalId, total, pin, draft.location_id);
+  };
+
+  const finalizeAuthorizedAccountSale = async (authorization) => {
+    const result = await syncAuthorizedAccountSale(saleLocalId, authorization);
+    const realSaleId = result.serverSaleId;
+    setPendingAccountCharge(null);
+    setApprovalPin("");
+    const promo = result.promoWins?.find((entry) => entry.saleId === realSaleId);
+    if (promo?.wins?.length) {
+      setReceiptSaleId(realSaleId);
+      setPendingPromoWins(promo.wins);
+      setShowPromoModal(true);
+    } else {
+      const receiptText = await getSaleReceipt(realSaleId).catch(
+        () => "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.",
+      );
+      setReceipt(receiptText);
+      setShowReceipt(true);
+      scheduleReset();
+    }
+    return realSaleId;
+  };
+
   const handleProcessPayment = async () => {
     if (!saleId || !saleLocalId) {
       setError("No active sale");
@@ -215,49 +241,20 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
           return;
         }
 
-        // Recording locally marks the sale completed (like cash/mpesa) so
-        // the normal offline-sync path picks it up, assigns a real server
-        // id, and runs stock/loyalty/promo side effects exactly once.
-        await recordAccountSale(saleId, saleLocalId, total);
-
-        let realSaleId = saleId;
-        const syncResult = await syncPendingSales();
-        realSaleId = syncResult?.saleServerIds?.[saleLocalId] || realSaleId;
-        if (typeof realSaleId !== "number") {
-          setError("Could not sync this sale to the server. Try again.");
-          setLoading(false);
+        const creditCheck = await requestAccountAuthorization();
+        if (creditCheck.wouldExceed && !creditCheck.authorization) {
+          setPendingAccountCharge({
+            saleId,
+            corporateAccountId: customer.corporate_account_id,
+            creditCheck,
+          });
           return;
         }
 
-        try {
-          await completeAccountSale(realSaleId, customer.corporate_account_id);
-        } catch (err) {
-          if (err.data?.requiresApproval) {
-            setPendingAccountCharge({
-              saleId: realSaleId,
-              corporateAccountId: customer.corporate_account_id,
-              creditCheck: err.data.creditCheck,
-            });
-            setLoading(false);
-            return;
-          }
-          throw err;
-        }
-
-        const promo = syncResult?.promoWins?.find(
-          (entry) => entry.saleId === realSaleId,
-        );
-        if (promo?.wins?.length) {
-          setReceiptSaleId(realSaleId);
-          setPendingPromoWins(promo.wins);
-          setShowPromoModal(true);
-        } else {
-          const receiptText = await getSaleReceipt(realSaleId);
-          setReceipt(receiptText);
-          setShowReceipt(true);
-          scheduleReset();
-        }
-        setLoading(false);
+        // Recording locally marks the sale completed (like cash/mpesa) so
+        // the normal offline-sync path picks it up, assigns a real server
+        // id, and runs stock/loyalty/promo side effects exactly once.
+        await finalizeAuthorizedAccountSale(creditCheck.authorization);
         return;
       }
 
@@ -310,7 +307,15 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
       }
 
     } catch (err) {
-      setError(err.message || "Failed to process payment");
+      if (paymentMethod === "account" && err.data?.requiresApproval && err.data.creditCheck) {
+        setPendingAccountCharge({
+          saleId,
+          corporateAccountId: customer.corporate_account_id,
+          creditCheck: err.data.creditCheck,
+        });
+      } else {
+        setError(err.message || "Failed to process payment");
+      }
     } finally {
       setLoading(false);
     }
@@ -435,12 +440,8 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     setApprovalLoading(true);
     setApprovalError("");
     try {
-      const { staff } = await verifyApprovalPin(approvalPin);
-      await completeAccountSale(
-        pendingAccountCharge.saleId,
-        pendingAccountCharge.corporateAccountId,
-        staff.id,
-      );
+      const creditCheck = await requestAccountAuthorization(approvalPin);
+      await finalizeAuthorizedAccountSale(creditCheck.authorization);
     } catch (err) {
       setApprovalError(err.message || "Approval failed");
       setApprovalLoading(false);
@@ -450,18 +451,6 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     // The account has already been charged at this point -- a receipt-fetch
     // hiccup below must not be reported as an approval failure, nor should
     // it stop the cart from resetting for a sale that already went through.
-    let receiptText;
-    try {
-      receiptText = await getSaleReceipt(pendingAccountCharge.saleId);
-    } catch (err) {
-      receiptText =
-        "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.";
-    }
-    setReceipt(receiptText);
-    setShowReceipt(true);
-    setPendingAccountCharge(null);
-    setApprovalPin("");
-    scheduleReset();
     setApprovalLoading(false);
   };
 
@@ -623,7 +612,8 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
                 setApprovalPin("");
                 setApprovalError("");
               }}
-              className="flex-1 py-2.5 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3">
+              disabled={approvalLoading}
+              className="flex-1 py-2.5 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 disabled:opacity-50">
               Cancel
             </button>
           </div>

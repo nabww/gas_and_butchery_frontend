@@ -344,6 +344,59 @@ function buildSnapshotForGroup(locationId, salesInGroup) {
   };
 }
 
+export async function syncAuthorizedAccountSale(localSaleId, authorization) {
+  if (!authorization) throw new Error("Account sale was not authorized. Check that the backend is up to date and retry.");
+  const sale = await getPendingSaleSnapshot(localSaleId);
+  if (!sale) throw new Error("No active sale");
+  const payment = {
+    local_id: `${localSaleId}:account`,
+    sale_local_id: localSaleId,
+    method: "account",
+    amount: sale.total,
+    status: "completed",
+    sync_status: "synced",
+    created_at: nowIso(),
+  };
+  const snapshot = buildSnapshotForGroup(sale.location_id, [{
+    ...sale,
+    status: "completed",
+    payment_method: "account",
+    payments: [payment],
+  }]);
+  snapshot.records.sales[0].account_authorization = authorization;
+  const result = await uploadSyncSnapshot(snapshot);
+  const rejection = result?.accountErrors?.[localSaleId];
+  if (rejection) {
+    const error = new Error(rejection.error || "Account sale requires approval");
+    error.data = rejection;
+    throw error;
+  }
+  const serverId = result?.saleServerIds?.[localSaleId];
+  if (!serverId || result.errors || result.conflicts) {
+    throw new Error("Could not confirm the account sale. Retry this checkout before starting another sale.");
+  }
+  const { items, payments, exchanges, pointsLedger, ...saleRecord } = sale;
+  await putRecord("sales", {
+    ...saleRecord,
+    status: "completed",
+    payment_method: "account",
+    sync_status: "synced",
+    server_id: serverId,
+  });
+  await putRecord("payments", payment);
+  for (const [table, rows] of [
+    ["sale_items", items],
+    ["cylinder_exchanges", exchanges],
+    ["points_ledger", pointsLedger],
+  ]) {
+    for (const row of rows || []) await putRecord(table, { ...row, sync_status: "synced" });
+  }
+  window.dispatchEvent(new CustomEvent("tezipos:sales-synced", {
+    detail: { saleServerIds: { [localSaleId]: serverId } },
+  }));
+  return { ...result, serverSaleId: serverId };
+}
+
 async function doSyncPendingSales() {
   const pending = await getAllPendingSnapshots();
   const pendingSaleIds = new Set(pending.map((sale) => sale.local_id));
@@ -351,7 +404,7 @@ async function doSyncPendingSales() {
   for (const entry of pendingPoints) {
     if (!entry.sale_local_id || pendingSaleIds.has(entry.sale_local_id)) continue;
     const snapshot = await getPendingSaleSnapshot(entry.sale_local_id);
-    if (snapshot) {
+    if (snapshot?.status === "completed") {
       pending.push(snapshot);
       pendingSaleIds.add(entry.sale_local_id);
     }
