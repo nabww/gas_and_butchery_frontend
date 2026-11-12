@@ -340,7 +340,7 @@ export default function GasRestockForm({
                 placeholder="Amount"
                 value={extra.amount}
                 onChange={(e) => updateExtra(index, "amount", e.target.value)}
-                className={`${inputClass} w-28`}
+                className={`${inputClass} !w-28`}
               />
               <button
                 type="button"

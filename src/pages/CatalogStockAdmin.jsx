@@ -574,7 +574,7 @@ function GasStockRow({
               <label className="text-xs text-textSecondary">
                 Filled lost (have {item.filled_qty})
                 <input
-                  className={`${inputClass} mt-1 w-28`}
+                  className={`${inputClass} mt-1 !w-28`}
                   type="number" min="0" max={item.filled_qty} step="1"
                   value={filledLost}
                   onChange={(e) => setFilledLost(e.target.value)}
@@ -584,7 +584,7 @@ function GasStockRow({
               <label className="text-xs text-textSecondary">
                 Empty lost (have {item.empty_qty})
                 <input
-                  className={`${inputClass} mt-1 w-28`}
+                  className={`${inputClass} mt-1 !w-28`}
                   type="number" min="0" max={item.empty_qty} step="1"
                   value={emptyLost}
                   onChange={(e) => setEmptyLost(e.target.value)}
@@ -1562,7 +1562,7 @@ function RefillRequestDetail({ request, onAction, actionBusy, errorMessage }) {
                   <span className="text-textMuted"> ({line.requested_qty - Number(line[counter])} outstanding)</span>
                 </span>
                 <input
-                  className={`${inputClass} w-20`} type="number" min="0" step="1"
+                  className={`${inputClass} !w-20`} type="number" min="0" step="1"
                   value={quantities[line.cylinder_brand_id] ?? ""}
                   placeholder="0"
                   onChange={(event) => setQuantities((prev) => ({ ...prev, [line.cylinder_brand_id]: event.target.value === "" ? "" : Number(event.target.value) }))}
@@ -2081,7 +2081,7 @@ function LivestockTab() {
             {extras.map((line, index) => (
               <div key={index} className="flex gap-2">
                 <input className={`${inputClass} flex-1 min-w-0`} placeholder="Description" value={line.description} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, description: e.target.value } : l)))} disabled={saving} />
-                <input className={`${inputClass} w-24 shrink-0`} type="number" min="0" step="0.01" placeholder="Amount" value={line.amount} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, amount: e.target.value } : l)))} disabled={saving} />
+                <input className={`${inputClass} !w-24 shrink-0`} type="number" min="0" step="0.01" placeholder="Amount" value={line.amount} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, amount: e.target.value } : l)))} disabled={saving} />
                 <button type="button" onClick={() => setExtras((prev) => prev.filter((_, i) => i !== index))} disabled={saving} className="px-2 py-1 rounded-lg border border-danger/30 text-danger text-xs font-semibold hover:bg-danger/10">×</button>
               </div>
             ))}
