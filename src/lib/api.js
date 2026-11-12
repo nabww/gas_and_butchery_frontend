@@ -27,8 +27,31 @@ export function resolveApiAssetUrl(url) {
   return url;
 }
 
+// Points the browser tab/PWA icon at the uploaded business logo so branding
+// follows whatever is configured in Settings. index.html ships a generic
+// icon-192.png fallback, which stays in place until a logo is assigned --
+// and returns if the logo is ever cleared. Called from every path that
+// receives a business config (sign-in, nav, settings) since they all run
+// through normalizeBusinessConfig below.
+function setFavicon(url) {
+  if (typeof document === "undefined") return;
+  const href = url || "/icon-192.png";
+  let icon = document.querySelector('link[rel="icon"]');
+  if (!icon) {
+    icon = document.createElement("link");
+    icon.rel = "icon";
+    document.head.appendChild(icon);
+  }
+  icon.href = href;
+  const appleTouch = document.querySelector('link[rel="apple-touch-icon"]');
+  if (appleTouch && url) appleTouch.href = url;
+}
+
 function normalizeBusinessConfig(config) {
-  return config ? { ...config, business_logo_url: resolveApiAssetUrl(config.business_logo_url) } : config;
+  if (!config) return config;
+  const normalized = { ...config, business_logo_url: resolveApiAssetUrl(config.business_logo_url) };
+  setFavicon(normalized.business_logo_url);
+  return normalized;
 }
 
 function logoUrlForStorage(url) {
