@@ -14,14 +14,41 @@ function HamburgerIcon({ open, size = 20 }) {
   );
 }
 
-function PowerIcon() {
+function PowerIcon({ size = 18 }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <path d="M10 2v7" />
       <path d="M6.1 5.2a7 7 0 1 0 7.8 0" />
     </svg>
   );
 }
+
+function SunIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="10" cy="10" r="3.5" />
+      <line x1="10" y1="1.5" x2="10" y2="3.5" />
+      <line x1="10" y1="16.5" x2="10" y2="18.5" />
+      <line x1="1.5" y1="10" x2="3.5" y2="10" />
+      <line x1="16.5" y1="10" x2="18.5" y2="10" />
+      <line x1="3.9" y1="3.9" x2="5.3" y2="5.3" />
+      <line x1="14.7" y1="14.7" x2="16.1" y2="16.1" />
+      <line x1="16.1" y1="3.9" x2="14.7" y2="5.3" />
+      <line x1="5.3" y1="14.7" x2="3.9" y2="16.1" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.2 11.2A7.5 7.5 0 1 1 8.8 2.8a6 6 0 0 0 8.4 8.4z" />
+    </svg>
+  );
+}
+
+const nameInitials = (name) =>
+  (name || '?').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
 // Shop switcher — admins can always switch shops; a supervisor only sees
 // this if explicitly granted `can_switch_location` (per-staff override,
@@ -54,10 +81,10 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
           alignItems: 'center',
           gap: 6,
           padding: '5px 10px',
-          borderRadius: 999,
-          border: '0.5px solid var(--border)',
-          background: 'var(--surface-1)',
-          color: 'var(--text-primary)',
+          borderRadius: 7,
+          border: '0.5px solid var(--border-accent)',
+          background: 'transparent',
+          color: 'var(--text-muted)',
           fontSize: 12,
           cursor: 'pointer',
         }}
@@ -410,16 +437,18 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
         <div style={{ flex: 1 }} />
 
         {/* Desktop right controls */}
-        <div className={collapsed ? 'hidden' : 'flex items-center gap-3'}>
+        <div className={collapsed ? 'hidden' : 'flex items-center gap-2'}>
           {showQuickSell && currentPath !== '/till' && (
             <button
               onClick={() => handleNav('/till')}
               style={{
-                border: 'none',
-                background: 'none',
+                border: '0.5px solid var(--border)',
+                background: 'var(--surface-2)',
                 color: 'var(--text-accent)',
-                fontSize: 13,
-                textDecoration: 'underline',
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '5px 14px',
+                borderRadius: 999,
                 cursor: 'pointer',
               }}
             >
@@ -429,19 +458,71 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           <button
             onClick={toggleTheme}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             style={{
-              border: 'none',
-              background: 'none',
-              fontSize: 12,
+              border: '0.5px solid var(--border)',
+              background: 'transparent',
               color: 'var(--text-muted)',
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
-          <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-            Sign out
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              paddingLeft: 10,
+              marginLeft: 4,
+              borderLeft: '0.5px solid var(--border)',
+            }}
+          >
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: 'var(--surface-3)',
+                color: 'var(--text-secondary)',
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {nameInitials(staff.name)}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+              {staff.name}
+            </span>
+          </div>
+          <button
+            onClick={onSignOut}
+            title="Sign out"
+            style={{
+              border: '0.5px solid var(--border)',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              fontSize: 12,
+              padding: '5px 10px',
+              borderRadius: 7,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <PowerIcon size={13} /> Sign out
           </button>
         </div>
 
@@ -613,16 +694,46 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               </div>
             )}
 
-            <div className="flex flex-col items-start gap-4">
+            <div
+              className="flex flex-col items-stretch gap-2 pt-4 mt-2"
+              style={{ borderTop: '0.5px solid var(--border)' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'var(--surface-3)',
+                    color: 'var(--text-secondary)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {nameInitials(staff.name)}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+                  {staff.name}
+                </span>
+              </div>
               {showQuickSell && currentPath !== '/till' && (
                 <button
                   onClick={() => handleNav('/till')}
                   style={{
-                    border: 'none',
-                    background: 'none',
+                    alignSelf: 'flex-start',
+                    border: '0.5px solid var(--border)',
+                    background: 'var(--surface-1)',
                     color: 'var(--text-accent)',
-                    fontSize: 13,
-                    textDecoration: 'underline',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    cursor: 'pointer',
                   }}
                 >
                   Sell
@@ -630,13 +741,39 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               )}
               <button
                 onClick={toggleTheme}
-                style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 2px',
+                  alignSelf: 'flex-start',
+                }}
               >
-                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
               </button>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staff.name}</span>
-              <button onClick={onSignOut} style={{ border: 'none', background: 'none', fontSize: 12, color: 'var(--text-muted)' }}>
-                Sign out
+              <button
+                onClick={onSignOut}
+                style={{
+                  alignSelf: 'flex-start',
+                  border: '0.5px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  padding: '6px 12px',
+                  borderRadius: 7,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <PowerIcon size={13} /> Sign out
               </button>
             </div>
           </div>

@@ -53,18 +53,8 @@ export async function recordMpesaSale(saleId, saleLocalId, amount) {
   return localResult;
 }
 
-/**
- * Record a sale locally as charged to a corporate account. Marks the sale
- * completed (like any other payment method) so the normal offline-sync
- * path picks it up, assigns a server id, and runs stock/loyalty/promo
- * side effects exactly once. The actual credit-limit check and corporate
- * ledger update happen server-side afterwards, once a real sale id exists
- * (see completeAccountSale in lib/api.js).
- */
-export async function recordAccountSale(saleId, saleLocalId, amount) {
-  const localResult = await recordLocalPayment(saleLocalId, {
-    method: "account",
-    amount,
-  });
-  return localResult;
-}
+// There is intentionally no recordAccountSale: account sales must go
+// through syncAuthorizedAccountSale (syncQueue.js), which attaches the
+// signed credit-check token the server requires before it will merge the
+// sale or debit the corporate ledger. A locally-completed 'account' sale
+// with no token is rejected on sync.

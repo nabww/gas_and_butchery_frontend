@@ -173,7 +173,7 @@ export default function App() {
         ) : currentPath === "/customers" ? (
           <CustomersAdmin staffRole={staff.role} />
         ) : currentPath === "/stock" || currentPath?.startsWith("/catalog") ? (
-          <CatalogStockAdmin staffRole={staff.role} initialTab={new URLSearchParams(currentPath.split("?")[1] || "").get("tab") || undefined} />
+          <CatalogStockAdmin staffRole={staff.role} initialTab={new URLSearchParams(currentPath.split("?")[1] || "").get("tab") || undefined} focusId={new URLSearchParams(currentPath.split("?")[1] || "").get("focus") || undefined} />
         ) : currentPath === "/expenses" ? (
           <Expenses />
         ) : currentPath === "/settings" ? (

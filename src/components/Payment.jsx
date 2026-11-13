@@ -163,7 +163,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
   const requestAccountAuthorization = async (pin) => {
     const draft = await getPendingSaleSnapshot(saleLocalId);
     if (!draft) throw new Error("No active sale");
-    return authorizeAccountSale(customer.corporate_account_id, saleLocalId, total, pin, draft.location_id);
+    return authorizeAccountSale(customer.corporate_account_id, saleLocalId, total, pin, draft.location_id, customer.id);
   };
 
   const finalizeAuthorizedAccountSale = async (authorization) => {

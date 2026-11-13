@@ -472,6 +472,7 @@ function GasStockRow({
   isExpanded,
   onCancelEdit,
   activeLocationId,
+  highlighted,
 }) {
   const [declaring, setDeclaring] = useState(false);
   const [filledLost, setFilledLost] = useState("0");
@@ -513,7 +514,9 @@ function GasStockRow({
 
   return (
     <>
-      <tr className="border-b border-borderColor last:border-0">
+      <tr
+        id={`gas-stock-row-${item.cylinder_brand_id}`}
+        className={`border-b border-borderColor last:border-0 scroll-mt-24 ${highlighted ? "bg-warning/10" : ""}`}>
         <td className="py-3 px-4">
           <p className="text-textPrimary font-semibold text-sm">
             {item.brand} {item.weight_kg}kg
@@ -888,7 +891,7 @@ function CatalogTab({ staffRole }) {
   );
 }
 
-function GasStockTab({ staffRole }) {
+function GasStockTab({ staffRole, focusId }) {
   const { activeLocationId } = useActiveLocation();
   const [stock, setStock] = useState([]);
   const [oversells, setOversells] = useState([]);
@@ -898,8 +901,31 @@ function GasStockTab({ staffRole }) {
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [highlightId, setHighlightId] = useState(null);
   const { toast, showToast, toastRef } = useToast();
   const isAdmin = staffRole === "admin";
+
+  const focusRow = useCallback((id) => {
+    const el = document.getElementById(`gas-stock-row-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightId(Number(id));
+  }, []);
+
+  // Deep links (e.g. the dashboard low-stock alert) jump straight to the
+  // flagged cylinder row once stock has loaded.
+  useEffect(() => {
+    if (!focusId || loading) return;
+    if (stock.some((s) => Number(s.cylinder_brand_id) === Number(focusId))) {
+      focusRow(focusId);
+    }
+  }, [focusId, loading, stock, focusRow]);
+
+  useEffect(() => {
+    if (highlightId == null) return;
+    const timer = setTimeout(() => setHighlightId(null), 5000);
+    return () => clearTimeout(timer);
+  }, [highlightId]);
 
   const loadStock = useCallback(async () => {
     setLoading(true);
@@ -1027,19 +1053,21 @@ function GasStockTab({ staffRole }) {
 
       {lowStockItems.length > 0 && (
         <div className="p-4 rounded-xl bg-warning/10 border border-warning/20">
-          <p className="text-warning font-semibold text-sm mb-2">
+          <p className="text-warning font-semibold text-sm mb-3">
             Low stock alerts ({lowStockItems.length})
           </p>
-          <ul className="space-y-1">
+          <div className="space-y-2">
             {lowStockItems.map((item) => (
-              <li
-                key={item.cylinder_brand_id}
-                className="text-warning/80 text-sm">
-                {item.brand} {item.weight_kg}kg — {item.filled_qty} filled
-                (threshold: {item.low_stock_threshold})
-              </li>
+              <p key={item.cylinder_brand_id} className="text-sm text-textPrimary">
+                <span className="font-medium">
+                  {item.brand} {item.weight_kg}kg
+                </span>
+                <span className="text-warning text-xs font-semibold ml-2">
+                  {item.filled_qty} filled · threshold {item.low_stock_threshold}
+                </span>
+              </p>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
@@ -1088,6 +1116,7 @@ function GasStockTab({ staffRole }) {
                   onUpdated={loadStock}
                   onEdit={openEdit}
                   activeLocationId={activeLocationId}
+                  highlighted={highlightId === Number(item.cylinder_brand_id)}
                   isExpanded={expandedId === item.cylinder_brand_id}
                   onCancelEdit={() => {
                     setExpandedId(null);
@@ -2252,7 +2281,7 @@ function LivestockTab() {
   );
 }
 
-export default function CatalogStockAdmin({ staffRole, initialTab }) {
+export default function CatalogStockAdmin({ staffRole, initialTab, focusId }) {
   const { activeLocationId, locations } = useActiveLocation();
   const activeLocation = locations.find((location) => String(location.id) === String(activeLocationId));
   const canTransfer = (staffRole === "admin" || staffRole === "supervisor") && Boolean(activeLocation?.is_stock_store);
@@ -2337,7 +2366,7 @@ export default function CatalogStockAdmin({ staffRole, initialTab }) {
             {activeTab === "catalog" && <CatalogTab key={`catalog-${tabVisit}`} staffRole={staffRole} />}
           </CTabPanel>
           <CTabPanel className="p-3" itemKey="gas">
-            {activeTab === "gas" && <GasStockTab key={`gas-${tabVisit}`} staffRole={staffRole} />}
+            {activeTab === "gas" && <GasStockTab key={`gas-${tabVisit}`} staffRole={staffRole} focusId={focusId} />}
           </CTabPanel>
 
           {canLivestock && (

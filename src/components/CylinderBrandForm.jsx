@@ -162,7 +162,7 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       return;
     }
     if (purchase < refillBuy) {
-      setError('Complete cylinder purchase cost must be at least the gas refill cost — the shell cost can\'t be negative');
+      setError('Complete cylinder purchase cost must be at least the gas refill cost, otherwise the shell cost would be negative');
       return;
     }
 
@@ -180,11 +180,11 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
     // Buy prices are saved to the brand before the take runs, so the form's
     // entered costs are what the expense will book at — validate against them.
     if (addedFilled > 0 && !(refillBuy > 0)) {
-      setError('Set the gas refill purchase cost — added filled stock is expensed at the declared buy prices');
+      setError('Set the gas refill purchase cost. Added filled stock is expensed at the declared buy prices');
       return;
     }
     if (addedEmpty > 0 && !(purchase - refillBuy > 0)) {
-      setError('Set the purchase and refill costs — added empty shells are expensed at the declared shell cost');
+      setError('Set the purchase and refill costs. Added empty shells are expensed at the declared shell cost');
       return;
     }
 
@@ -327,157 +327,214 @@ export default function CylinderBrandForm({ editing, onSaved, onCancel }) {
       )}
 
       {hasSelection && (
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>Brand</label>
-            <input
-              className={inputClass}
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              disabled={isBrandLocked}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Weight (kg)
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              step='0.1'
-              value={weightKg}
-              onChange={(e) => setWeightKg(e.target.value)}
-              disabled={isBrandLocked}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Customer refill price (sell)
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              step='0.01'
-              value={refillPrice}
-              onChange={(e) => setRefillPrice(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Complete cylinder price (sell)
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              step='0.01'
-              value={cylinderValue}
-              onChange={(e) => setCylinderValue(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Complete cylinder purchase cost (buy)
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              step='0.01'
-              value={purchaseCost}
-              onChange={(e) => setPurchaseCost(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Gas refill purchase cost (buy)
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              step='0.01'
-              value={refillCost}
-              onChange={(e) => setRefillCost(e.target.value)}
-            />
-          </div>
-          <div className='md:col-span-2 text-textMuted text-xs'>
-            Shell cost: KES {Math.max(Number(purchaseCost || 0) - Number(refillCost || 0), 0).toFixed(2)}
-            {' · '}Shell sell value: KES {Math.max(Number(cylinderValue || 0) - Number(refillPrice || 0), 0).toFixed(2)}
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Filled stock
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              value={filledQty}
-              onChange={(e) => setFilledQty(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Empty stock
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              value={emptyQty}
-              onChange={(e) => setEmptyQty(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className='text-textMuted text-xs block mb-1'>
-              Low-stock threshold
-            </label>
-            <input
-              className={inputClass}
-              type='number'
-              min='0'
-              value={lowStockThreshold}
-              onChange={(e) => setLowStockThreshold(e.target.value)}
-            />
-          </div>
-          <div className='flex items-center pt-6'>
-            <label className='flex items-center gap-2 text-xs text-textSecondary'>
+        <div className='space-y-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+            <div>
+              <label className='text-textMuted text-xs block mb-1'>Brand</label>
               <input
-                type='checkbox'
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
+                className={inputClass}
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                disabled={isBrandLocked}
               />
-              Active
-            </label>
-          </div>
-
-          {showTakeFields && (
+            </div>
             <div>
               <label className='text-textMuted text-xs block mb-1'>
-                Paid by
+                Weight (kg)
               </label>
-              <select
+              <input
                 className={inputClass}
-                value={takePaymentMethod}
-                onChange={(e) => setTakePaymentMethod(e.target.value)}>
-                <option value='cash'>Cash</option>
-                <option value='mpesa'>M-Pesa</option>
-                <option value='account'>On account</option>
-              </select>
+                type='number'
+                min='0'
+                step='0.1'
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+                disabled={isBrandLocked}
+              />
             </div>
-          )}
+          </div>
+
+          <div>
+            <p className='text-textSecondary text-xs font-semibold border-t border-borderColor pt-3 mb-2'>
+              Sell prices (what customers pay)
+            </p>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Refill / swap price
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={refillPrice}
+                  onChange={(e) => setRefillPrice(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Customer swaps an empty for a filled cylinder
+                </p>
+              </div>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Full cylinder price
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={cylinderValue}
+                  onChange={(e) => setCylinderValue(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Gas + shell, for a first-time buyer with no empty to swap
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className='text-textSecondary text-xs font-semibold border-t border-borderColor pt-3 mb-2'>
+              Purchase costs (what you pay the supplier)
+            </p>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Full cylinder cost
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={purchaseCost}
+                  onChange={(e) => setPurchaseCost(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Supplier price for gas + shell
+                </p>
+              </div>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Gas refill cost
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  step='0.01'
+                  value={refillCost}
+                  onChange={(e) => setRefillCost(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Supplier charge per refill; the difference above is the shell cost
+                </p>
+              </div>
+            </div>
+            <p className='text-textMuted text-xs mt-2'>
+              Shell cost: KES {Math.max(Number(purchaseCost || 0) - Number(refillCost || 0), 0).toFixed(2)}
+              {' · '}Shell sell value: KES {Math.max(Number(cylinderValue || 0) - Number(refillPrice || 0), 0).toFixed(2)}
+            </p>
+          </div>
+
+          <div>
+            <p className='text-textSecondary text-xs font-semibold border-t border-borderColor pt-3 mb-2'>
+              Stock on hand (total counts, not amounts to add)
+            </p>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Filled cylinders on hand
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  value={filledQty}
+                  onChange={(e) => setFilledQty(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Currently {Number(baseNow?.filled_qty || 0)}
+                  {previewAddedFilled > 0
+                    ? ` → entering this adds +${previewAddedFilled} and books a purchase expense`
+                    : Number(filledQty || 0) < Number(baseNow?.filled_qty || 0)
+                      ? ` → entering this removes ${Number(baseNow?.filled_qty || 0) - Number(filledQty || 0)} as a count correction`
+                      : ''}
+                </p>
+              </div>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Empty shells on hand
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  value={emptyQty}
+                  onChange={(e) => setEmptyQty(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Currently {Number(baseNow?.empty_qty || 0)}
+                  {previewAddedEmpty > 0
+                    ? ` → entering this adds +${previewAddedEmpty} and books a purchase expense`
+                    : Number(emptyQty || 0) < Number(baseNow?.empty_qty || 0)
+                      ? ` → entering this removes ${Number(baseNow?.empty_qty || 0) - Number(emptyQty || 0)} as a count correction`
+                      : ''}
+                </p>
+              </div>
+              <div>
+                <label className='text-textMuted text-xs block mb-1'>
+                  Low-stock threshold
+                </label>
+                <input
+                  className={inputClass}
+                  type='number'
+                  min='0'
+                  value={lowStockThreshold}
+                  onChange={(e) => setLowStockThreshold(e.target.value)}
+                />
+                <p className='text-textMuted text-xs mt-1'>
+                  Warn when filled stock drops to this count
+                </p>
+              </div>
+              <div className='flex items-center pt-6'>
+                <label className='flex items-center gap-2 text-xs text-textSecondary'>
+                  <input
+                    type='checkbox'
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                  />
+                  Active
+                </label>
+              </div>
+
+              {showTakeFields && (
+                <div>
+                  <label className='text-textMuted text-xs block mb-1'>
+                    Added stock paid by
+                  </label>
+                  <select
+                    className={inputClass}
+                    value={takePaymentMethod}
+                    onChange={(e) => setTakePaymentMethod(e.target.value)}>
+                    <option value='cash'>Cash</option>
+                    <option value='mpesa'>M-Pesa</option>
+                    <option value='account'>On account</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {showTakeFields && (
         <p className='text-textMuted text-xs'>
           Quantities added above the current count are recorded as an
-          opening-stock expense at the brand's declared buy prices — filled
+          opening-stock expense at the brand's declared buy prices: filled
           cylinders at gas cost plus shell cost, empty shells at the shell
-          cost. Reducing a count is a correction — no expense.
+          cost. Reducing a count is a correction; no expense is posted.
         </p>
       )}
 

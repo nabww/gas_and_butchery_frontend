@@ -48,6 +48,7 @@ export default function GasRestockForm({
         line,
         item,
         qty,
+        unitCost,
         productCost: qty * unitCost,
       };
     });
@@ -66,13 +67,21 @@ export default function GasRestockForm({
         }
       }
       allocatedSoFar = Number((allocatedSoFar + allocated).toFixed(2));
-      // Refilling moves the empty shell's fixed cylinder_value into the filled cost; a
-      // purchased filled cylinder's unit cost already includes its shell. Mirrors the backend.
-      const shellUnitValue = l.line.mode === "refill" ? Number(l.item?.cylinder_value || 0) : 0;
+      // Refilling moves the empty shell's declared cost (purchase_cost minus
+      // refill_cost) into the filled cost; a purchased filled cylinder's unit
+      // cost already includes its shell. Mirrors the backend.
+      const shellUnitValue = l.line.mode === "refill"
+        ? Math.max(Number(l.item?.purchase_cost || 0) - Number(l.item?.refill_cost || 0), 0)
+        : 0;
       const shellTotal = Number((shellUnitValue * l.qty).toFixed(2));
       const totalCapitalized = Number((l.productCost + allocated + shellTotal).toFixed(2));
       const landedUnitCost = l.qty > 0 ? Number((totalCapitalized / l.qty).toFixed(2)) : 0;
-      return { ...l, allocated, shellUnitValue, totalCapitalized, landedUnitCost };
+      // Refills sell at the swap price (shell comes back); purchases sell at
+      // the full cylinder price. Flag buys that cost more than they sell for.
+      const sellPrice = l.line.mode === "refill"
+        ? Number(l.item?.refill_price || 0)
+        : Number(l.item?.cylinder_value || 0);
+      return { ...l, allocated, shellUnitValue, totalCapitalized, landedUnitCost, sellPrice };
     });
     const productTotal = items.reduce((sum, l) => sum + l.productCost, 0);
     return {
@@ -225,7 +234,7 @@ export default function GasRestockForm({
                       <option value="">Choose brand...</option>
                       {stock.map((s) => (
                         <option key={s.cylinder_brand_id} value={s.cylinder_brand_id}>
-                          {s.brand} {s.weight_kg}kg — {s.filled_qty} filled / {s.empty_qty} empty
+                          {s.brand} {s.weight_kg}kg ({s.filled_qty} filled, {s.empty_qty} empty)
                         </option>
                       ))}
                     </select>
@@ -287,6 +296,11 @@ export default function GasRestockForm({
                     {calc?.shellUnitValue > 0 && (
                       <p className="text-textMuted text-[11px]">
                         includes KES {calc.shellUnitValue.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} shell value
+                      </p>
+                    )}
+                    {calc?.sellPrice > 0 && calc?.unitCost > calc.sellPrice && (
+                      <p className="text-warning text-[11px]">
+                        Unit cost is above the {line.mode === "refill" ? "refill" : "full cylinder"} sell price; these cylinders will sell at a loss
                       </p>
                     )}
                   </div>

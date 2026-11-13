@@ -276,12 +276,13 @@ export async function getM2pesaStatus(mpesaTransactionId) {
   return apiFetch(`/payments/mpesa/status/${mpesaTransactionId}`);
 }
 
-export async function authorizeAccountSale(corporateAccountId, saleLocalId, saleTotal, approvalPin, locationId) {
+export async function authorizeAccountSale(corporateAccountId, saleLocalId, saleTotal, approvalPin, locationId, customerId) {
   return apiFetch(`/corporate/accounts/${corporateAccountId}/credit-check`, {
     method: "POST",
     body: JSON.stringify({
       sale_local_id: saleLocalId,
       sale_total: saleTotal,
+      customer_id: customerId || undefined,
       approval_pin: approvalPin || undefined,
       location_id: locationId,
     }),
@@ -294,24 +295,6 @@ export async function linkM2pesaToSale(mpesaTransactionId, saleId) {
     body: JSON.stringify({
       mpesa_transaction_id: mpesaTransactionId,
       sale_id: saleId,
-    }),
-  });
-}
-
-/**
- * Complete a sale by charging it to a corporate account. If the sale would
- * exceed the account's credit limit, the backend responds 402 with
- * { requiresApproval: true, creditCheck } (surfaced on err.data) — call
- * verifyApprovalPin() to get a supervisor/admin staff id, then retry with
- * creditOverrideStaffId set.
- */
-export async function completeAccountSale(saleId, corporateAccountId, creditOverrideStaffId = null) {
-  return apiFetch("/payments/account", {
-    method: "POST",
-    body: JSON.stringify({
-      sale_id: saleId,
-      corporate_account_id: corporateAccountId,
-      credit_override_staff_id: creditOverrideStaffId,
     }),
   });
 }

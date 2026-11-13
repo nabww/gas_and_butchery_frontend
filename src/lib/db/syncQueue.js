@@ -372,8 +372,21 @@ export async function syncAuthorizedAccountSale(localSaleId, authorization) {
     throw error;
   }
   const serverId = result?.saleServerIds?.[localSaleId];
-  if (!serverId || result.errors || result.conflicts) {
+  if (!serverId) {
     throw new Error("Could not confirm the account sale. Retry this checkout before starting another sale.");
+  }
+  // The sale + account charge commit atomically BEFORE items/payments/etc.
+  // merge, so errors/conflicts on those child records must NOT be reported
+  // as a failed checkout -- that used to tell the cashier "could not
+  // confirm" for a sale that had already gone through (e.g. when a too-long
+  // payment local_id made the child insert fail), inviting a duplicate
+  // re-ring.
+  if (result.errors || result.conflicts) {
+    console.warn(
+      `Account sale ${localSaleId} charged (server id ${serverId}) but ` +
+        `${result.errors || 0} child record(s) failed and ${result.conflicts || 0} conflicted`,
+      result,
+    );
   }
   const { items, payments, exchanges, pointsLedger, ...saleRecord } = sale;
   await putRecord("sales", {

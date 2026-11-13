@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useActiveLocation } from "../contexts/LocationContext";
 import {
   getSalesReport,
@@ -112,7 +112,7 @@ function TrendChart({ data, height = 200 }) {
   );
 }
 
-function KpiCard({ label, value, subtext, tone = "default" }) {
+function KpiCard({ label, value, subtext, tone = "default", warning }) {
   const toneClasses = {
     default: "border-borderColor bg-surface2",
     success: "border-success/30 bg-success/5",
@@ -125,15 +125,25 @@ function KpiCard({ label, value, subtext, tone = "default" }) {
   };
   return (
     <div className={`rounded-2xl border p-4 ${toneClasses[tone]}`}>
-      <p className="text-textSecondary text-xs font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-textSecondary text-xs font-medium uppercase tracking-wide">
+        {label}
+        {warning && (
+          <span className="ml-1 text-warning normal-case" title={warning}>
+            ⚠
+          </span>
+        )}
+      </p>
       <p className={`text-2xl font-bold mt-1 ${textTone[tone]}`}>{value}</p>
       {subtext && <p className="text-textMuted text-xs mt-1">{subtext}</p>}
+      {warning && <p className="text-warning text-xs mt-1">{warning}</p>}
     </div>
   );
 }
 
 // Hero KPIs — the numbers the owner checks first. Larger type, denser card.
-function HeroCard({ label, value, subtext, tone = "default" }) {
+// `onClick` turns the card into a jump-link (e.g. "Needs attention" sends
+// the owner straight to whatever needs resolving).
+function HeroCard({ label, value, subtext, tone = "default", onClick }) {
   const toneClasses = {
     default: "border-borderColor bg-surface2",
     success: "border-success/40 bg-success/5",
@@ -144,8 +154,19 @@ function HeroCard({ label, value, subtext, tone = "default" }) {
     success: "text-success",
     danger: "text-danger",
   };
+  const interactive = typeof onClick === "function";
   return (
-    <div className={`rounded-2xl border-2 p-5 ${toneClasses[tone]}`}>
+    <div
+      className={`rounded-2xl border-2 p-5 ${toneClasses[tone]} ${
+        interactive ? "cursor-pointer hover:border-borderStrong transition-colors" : ""
+      }`}
+      {...(interactive && {
+        role: "button",
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e) => (e.key === "Enter" || e.key === " ") && onClick(),
+      })}
+    >
       <p className="text-textSecondary text-xs font-semibold uppercase tracking-wider">{label}</p>
       <p className={`text-3xl sm:text-4xl font-bold mt-2 ${textTone[tone]}`}>{value}</p>
       {subtext && <p className="text-textSecondary text-xs mt-2">{subtext}</p>}
@@ -317,6 +338,22 @@ export default function Dashboard({ onNavigate }) {
   const expenses = ledger?.expenses || {};
   const restockExpenses = Number(expenses?.stock || 0) + Number(expenses?.refills || 0);
   const operatingExpenses = Number(expenses?.operating || 0);
+  // Promo/cashback/prize and catalog-reward costs — every expense that is
+  // NOT an inventory purchase. Restocks are deliberately excluded from
+  // both: they are cash outflow, not a P&L cost (their cost only reaches
+  // profit as COGS when the stock actually sells).
+  const promoRewardCosts =
+    Number(expenses?.promoCashback || 0) +
+    Number(expenses?.promoPrizes || 0) +
+    Number(expenses?.rewards || 0);
+  const expensesTotal = Number(expenses?.total || 0);
+  const incomeTotal = Number(income?.total || 0);
+  // The true bottom line: gross profit less operating expenses only.
+  // Restocks are cash outflow, not a P&L cost (they reach profit as COGS
+  // when the stock sells), and promo/reward costs are shown separately.
+  // This used to be left as a mental-math exercise between the Gross
+  // profit and expense cards, which hid losses entirely.
+  const netProfit = grossProfit - operatingExpenses;
   // Credit sold this period that hasn't been collected yet -- shown as
   // negative since it's money extended, not money in hand.
   const creditBalance = -(income?.creditExtended || 0);
@@ -362,6 +399,32 @@ export default function Dashboard({ onNavigate }) {
     overdue > 0 && "overdue invoices",
   ].filter(Boolean).join(" · ");
   const discountsHigh = revenue > 0 && discounts > revenue * 0.15;
+
+  // The "Needs attention" hero card deep-links to wherever the most urgent
+  // flag is actually resolved: stock issues and oversells in Catalog &
+  // Stock, unpaid/overdue AR in Corporate Accounts, pending promo payouts
+  // via the on-page section (scroll target, since the action buttons live
+  // there rather than on another screen).
+  const rewardsSectionRef = useRef(null);
+  const attentionActionable =
+    flagCount > 0 &&
+    (oversells.length > 0 ||
+      lowStock.length > 0 ||
+      unpaidCredit > 0 ||
+      overdue > 0 ||
+      (pendingPromoCount > 0 && !!activeLocationId));
+  const handleAttentionClick = () => {
+    if (lowStock.length > 0) {
+      // Jump straight to the first flagged cylinder on the gas stock tab.
+      onNavigate?.(`/catalog?tab=gas&focus=${lowStock[0].cylinder_brand_id}`);
+    } else if (oversells.length > 0) {
+      onNavigate?.("/stock");
+    } else if (unpaidCredit > 0 || overdue > 0) {
+      onNavigate?.("/corporate");
+    } else {
+      rewardsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   const narratives = useMemo(() => {
     const items = [];
@@ -511,25 +574,44 @@ export default function Dashboard({ onNavigate }) {
         <HeroCard
           label="Net cash"
           value={formatKes(totalIncome)}
-          subtext={invoicePaymentsReceivedCount > 0
-            ? `Includes ${formatKes(invoicePaymentsReceived)} from ${invoicePaymentsReceivedCount} invoice payment(s)`
-            : "Collected income less recorded costs for this period"}
+          subtext={
+            `Cash collected ${formatKes(incomeTotal)} minus expenses ${formatKes(expensesTotal)}` +
+            (invoicePaymentsReceivedCount > 0
+              ? ` · incl. ${formatKes(invoicePaymentsReceived)} invoice payments`
+              : "")
+          }
           tone={totalIncome > 0 ? "success" : totalIncome < 0 ? "danger" : "default"}
         />
         <HeroCard
           label="Needs attention"
           value={flagCount === 0 ? "All clear" : flagCount}
-          subtext={flagCount === 0 ? "No flagged items right now" : flagDetail}
+          subtext={
+            flagCount === 0
+              ? "No flagged items right now"
+              : flagDetail + (attentionActionable ? " · tap to resolve" : "")
+          }
           tone={flagCount > 0 ? "danger" : "success"}
+          onClick={attentionActionable ? handleAttentionClick : undefined}
         />
       </section>
 
       <KpiSection
         title="Sales & Cash"
         cards={[
-          { label: "Cash", value: formatKes(cash) },
-          { label: "M-Pesa", value: formatKes(mpesa) },
-          { label: "Account / credit sales", value: formatKes(account) },
+          { label: "Cash", value: formatKes(cash), zero: cash <= 0 },
+          { label: "M-Pesa", value: formatKes(mpesa), zero: mpesa <= 0 },
+          {
+            // "Invoiced", not "credit" -- pairing the word "credit" with the
+            // collapsed "Nothing to report: Unpaid credit" line underneath
+            // read like a bug, so the collection state lives in the subtext.
+            label: "Invoiced sales",
+            value: formatKes(account),
+            subtext:
+              unpaidCredit > 0
+                ? `${formatKes(unpaidCredit)} still outstanding`
+                : "100% collected (KES 0.00 unpaid)",
+            zero: account <= 0,
+          },
           {
             label: "Unpaid credit",
             value: formatKes(unpaidCredit),
@@ -544,15 +626,29 @@ export default function Dashboard({ onNavigate }) {
       <KpiSection
         title="Profitability"
         cards={[
-          { label: "COGS", value: formatKes(cogs), subtext: "Cost of goods sold in selected period" },
+          {
+            label: "COGS",
+            value: formatKes(cogs),
+            subtext: "Cost of goods sold in selected period",
+            warning:
+              oversells.length > 0
+                ? "Unresolved oversells — margins may be off until stock is corrected"
+                : null,
+          },
           {
             label: "Gross profit",
             value: formatKes(grossProfit),
             subtext: "Revenue less cost of goods sold",
             tone: grossProfit > 0 ? "success" : grossProfit < 0 ? "danger" : "default",
           },
-          { label: "Operating expenses", value: formatKes(operatingExpenses), subtext: "Transport, utilities, wages and other costs", zero: operatingExpenses <= 0 },
-          { label: "All expenses", value: formatKes(expenses?.total || 0), subtext: "Restocks, operating costs, promotions and rewards", zero: Number(expenses?.total || 0) <= 0 },
+          {
+            label: "Net profit / loss",
+            value: formatKes(netProfit),
+            subtext: "Gross profit less operating expenses",
+            tone: netProfit > 0 ? "success" : netProfit < 0 ? "danger" : "default",
+          },
+          { label: "Operating expenses", value: formatKes(operatingExpenses), subtext: "Transport, utilities, wages and other running costs", zero: operatingExpenses <= 0 },
+          { label: "Promotions & rewards", value: formatKes(promoRewardCosts), subtext: "Cashback, prizes and loyalty rewards issued", zero: promoRewardCosts <= 0 },
           { label: "Recorded expense entries", value: expenses?.postedCount || 0, subtext: isToday ? "Posted today" : "Posted in selected period", zero: !expenses?.postedCount },
         ]}
       />
@@ -560,11 +656,22 @@ export default function Dashboard({ onNavigate }) {
       <KpiSection
         title="Inventory"
         cards={[
-          { label: "Inventory value", value: formatKes(inventoryValue?.totalValue), subtext: "Current stock value at landed cost" },
           {
-            label: "Restock expenses",
+            label: "Inventory value",
+            value: formatKes(inventoryValue?.totalValue),
+            subtext: "Current stock value at landed cost",
+            warning:
+              oversells.length > 0
+                ? "Unresolved oversells — value may be off until stock is corrected"
+                : null,
+          },
+          {
+            // Cash outflow, deliberately kept out of the Profitability
+            // section: treating restocks as an expense reads like a double
+            // charge alongside COGS.
+            label: "Inventory purchases",
             value: formatKes(restockExpenses),
-            subtext: `${formatKes(expenses?.stock || 0)} inventory · ${formatKes(expenses?.refills || 0)} gas refills`,
+            subtext: `${formatKes(expenses?.stock || 0)} inventory · ${formatKes(expenses?.refills || 0)} gas refills · cash outflow, not an operating expense`,
             zero: restockExpenses <= 0,
           },
           { label: "Low-stock items", value: lowStock.length, tone: lowStock.length > 0 ? "danger" : "default", zero: lowStock.length === 0 },
@@ -633,9 +740,14 @@ export default function Dashboard({ onNavigate }) {
               <p className="text-textSecondary text-xs uppercase tracking-wide mb-2">Low stock</p>
               <div className="space-y-1">
                 {lowStock.slice(0, 5).map((item) => (
-                  <div key={item.cylinder_brand_id} className="text-sm text-textPrimary">
-                    {item.brand} {item.weight_kg}kg — {item.filled_qty} filled (threshold {item.low_stock_threshold})
-                  </div>
+                  <button
+                    key={item.cylinder_brand_id}
+                    type="button"
+                    onClick={() => onNavigate?.(`/catalog?tab=gas&focus=${item.cylinder_brand_id}`)}
+                    className="block w-full text-left text-sm text-textPrimary rounded-lg px-2 py-1 -mx-2 hover:bg-surface3">
+                    {item.brand} {item.weight_kg}kg ({item.filled_qty} filled, threshold {item.low_stock_threshold})
+                    <span className="text-textMuted text-xs ml-2">→ open in stock</span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -656,7 +768,7 @@ export default function Dashboard({ onNavigate }) {
       )}
 
       {activeLocationId && (pendingRewards.length > 0 || payoutError) && (
-      <section className="rounded-2xl bg-surface2 border border-borderColor p-5 mt-6">
+      <section ref={rewardsSectionRef} className="rounded-2xl bg-surface2 border border-borderColor p-5 mt-6 scroll-mt-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-textPrimary font-bold">
             Pending rewards & cashback{activeLocationId ? ` — ${activeLocationName}` : ""}
