@@ -336,9 +336,15 @@ export async function getLocationMpesaConfig(locationId) {
 }
 
 export async function saveLocationMpesaConfig(locationId, payload) {
+  // The form state is camelCase; the API contract is snake_case.
+  const { consumerKey, consumerSecret, ...rest } = payload;
   return apiFetch(`/staff/locations/${locationId}/mpesa-config`, {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...rest,
+      consumer_key: consumerKey ?? payload.consumer_key,
+      consumer_secret: consumerSecret ?? payload.consumer_secret,
+    }),
   });
 }
 
