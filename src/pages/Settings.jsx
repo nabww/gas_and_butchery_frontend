@@ -638,6 +638,8 @@ function ShopsSettingsSection({ setMessage }) {
     consumerKey: "",
     consumerSecret: "",
     passkey: "",
+    transactionType: "CustomerPayBillOnline",
+    partyB: "",
   });
   const [selectedMpesaLocationId, setSelectedMpesaLocationId] = useState(null);
   const [mpesaLoading, setMpesaLoading] = useState(false);
@@ -730,6 +732,8 @@ function ShopsSettingsSection({ setMessage }) {
         consumerKey: cfg.consumerKey || "",
         consumerSecret: cfg.consumerSecret || "",
         passkey: cfg.passkey || "",
+        transactionType: cfg.transaction_type || "CustomerPayBillOnline",
+        partyB: cfg.party_b || "",
       });
     } catch (err) {
       setMessage(err.message || "Failed to load M-Pesa config.");
@@ -766,6 +770,8 @@ function ShopsSettingsSection({ setMessage }) {
         consumerKey: "",
         consumerSecret: "",
         passkey: "",
+        transactionType: "CustomerPayBillOnline",
+        partyB: "",
       });
       setMessage("M-Pesa config reset to global fallback.");
     } catch (err) {
@@ -1040,6 +1046,26 @@ function ShopsSettingsSection({ setMessage }) {
                     type="password"
                     value={mpesaForm.passkey}
                     onChange={(e) => setMpesaForm({ ...mpesaForm, passkey: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Till type</label>
+                  <select
+                    className={input}
+                    value={mpesaForm.transactionType}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, transactionType: e.target.value })}
+                    disabled={mpesaLoading || !isAdmin}>
+                    <option value="CustomerPayBillOnline">PayBill</option>
+                    <option value="CustomerBuyGoodsOnline">Buy Goods (till / store number)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={label}>Party B (optional — defaults to shortcode)</label>
+                  <input
+                    className={input}
+                    value={mpesaForm.partyB}
+                    onChange={(e) => setMpesaForm({ ...mpesaForm, partyB: e.target.value })}
                     disabled={mpesaLoading || !isAdmin}
                   />
                 </div>
