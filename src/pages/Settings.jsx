@@ -644,6 +644,24 @@ function ShopsSettingsSection({ setMessage }) {
   });
   const [selectedMpesaLocationId, setSelectedMpesaLocationId] = useState(null);
   const [mpesaLoading, setMpesaLoading] = useState(false);
+  // What the server actually has stored, and the result of the last save --
+  // shown inside the form. The page-level message sits far above this table,
+  // so saves and failures here used to look like nothing happened.
+  const [mpesaSaved, setMpesaSaved] = useState(null);
+  const [mpesaStatus, setMpesaStatus] = useState(null);
+
+  const applyMpesaConfig = (cfg) => {
+    setMpesaSaved(cfg);
+    setMpesaForm({
+      environment: cfg.environment || "sandbox",
+      shortcode: cfg.shortcode || "",
+      consumerKey: "",
+      consumerSecret: "",
+      passkey: "",
+      transactionType: cfg.transaction_type || "CustomerPayBillOnline",
+      partyB: cfg.party_b || "",
+    });
+  };
 
   const loadLocations = async () => {
     setLoading(true);
@@ -724,20 +742,12 @@ function ShopsSettingsSection({ setMessage }) {
   const loadMpesaConfig = async (locationId) => {
     setSelectedMpesaLocationId(locationId);
     setMpesaLoading(true);
-    setMessage("");
+    setMpesaStatus(null);
+    setMpesaSaved(null);
     try {
-      const cfg = await getLocationMpesaConfig(locationId);
-      setMpesaForm({
-        environment: cfg.environment || "sandbox",
-        shortcode: cfg.shortcode || "",
-        consumerKey: cfg.consumerKey || "",
-        consumerSecret: cfg.consumerSecret || "",
-        passkey: cfg.passkey || "",
-        transactionType: cfg.transaction_type || "CustomerPayBillOnline",
-        partyB: cfg.party_b || "",
-      });
+      applyMpesaConfig(await getLocationMpesaConfig(locationId));
     } catch (err) {
-      setMessage(err.message || "Failed to load M-Pesa config.");
+      setMpesaStatus({ ok: false, text: err.message || "Failed to load M-Pesa config." });
     } finally {
       setMpesaLoading(false);
     }
@@ -747,12 +757,13 @@ function ShopsSettingsSection({ setMessage }) {
     e.preventDefault();
     if (!isAdmin || !selectedMpesaLocationId) return;
     setMpesaLoading(true);
-    setMessage("");
+    setMpesaStatus(null);
     try {
-      await saveLocationMpesaConfig(selectedMpesaLocationId, mpesaForm);
-      setMessage("M-Pesa config saved.");
+      const saved = await saveLocationMpesaConfig(selectedMpesaLocationId, mpesaForm);
+      applyMpesaConfig(saved);
+      setMpesaStatus({ ok: true, text: "Saved. The next M-Pesa payment from this shop uses these settings." });
     } catch (err) {
-      setMessage(err.message || "Failed to save M-Pesa config.");
+      setMpesaStatus({ ok: false, text: err.message || "Failed to save M-Pesa config." });
     } finally {
       setMpesaLoading(false);
     }
@@ -768,21 +779,13 @@ function ShopsSettingsSection({ setMessage }) {
   const performMpesaReset = async () => {
     setConfirmMpesaReset(false);
     setMpesaLoading(true);
-    setMessage("");
+    setMpesaStatus(null);
     try {
       await resetLocationMpesaConfig(selectedMpesaLocationId);
-      setMpesaForm({
-        environment: "sandbox",
-        shortcode: "",
-        consumerKey: "",
-        consumerSecret: "",
-        passkey: "",
-        transactionType: "CustomerPayBillOnline",
-        partyB: "",
-      });
-      setMessage("M-Pesa config reset to global fallback.");
+      applyMpesaConfig({ configured: false, source: "env" });
+      setMpesaStatus({ ok: true, text: "Reset. This shop now uses the server's global (.env) M-Pesa settings." });
     } catch (err) {
-      setMessage(err.message || "Failed to reset M-Pesa config.");
+      setMpesaStatus({ ok: false, text: err.message || "Failed to reset M-Pesa config." });
     } finally {
       setMpesaLoading(false);
     }
@@ -790,13 +793,9 @@ function ShopsSettingsSection({ setMessage }) {
 
   const closeMpesaConfig = () => {
     setSelectedMpesaLocationId(null);
-    setMpesaForm({
-      environment: "sandbox",
-      shortcode: "",
-      consumerKey: "",
-      consumerSecret: "",
-      passkey: "",
-    });
+    setMpesaStatus(null);
+    applyMpesaConfig({ configured: false });
+    setMpesaSaved(null);
   };
 
   const input =
@@ -1003,9 +1002,30 @@ function ShopsSettingsSection({ setMessage }) {
                         <td colSpan={5} className="p-4 bg-surface1">
                           <form onSubmit={saveMpesaConfig} className="space-y-4">
                 <p className="text-textPrimary font-semibold text-sm">M-Pesa config for {loc.name}</p>
-                <p className="text-textMuted text-xs">
-                  Leave fields blank to use the global .env M-Pesa configuration.
-                </p>
+                {mpesaSaved && (
+                  <div className="rounded-lg border border-borderColor bg-surface2 p-3 text-xs text-textSecondary space-y-1">
+                    {mpesaSaved.configured ? (
+                      <>
+                        <p className="font-semibold text-textPrimary">
+                          Saved for this shop (overrides the server's .env settings)
+                        </p>
+                        <p>
+                          {mpesaSaved.environment} · shortcode {mpesaSaved.shortcode} ·{" "}
+                          {mpesaSaved.transaction_type === "CustomerBuyGoodsOnline" ? "Buy Goods" : "PayBill"} · Party B{" "}
+                          {mpesaSaved.party_b || `${mpesaSaved.shortcode} (same as shortcode)`}
+                        </p>
+                        {mpesaSaved.updated_at && (
+                          <p>Last updated {new Date(mpesaSaved.updated_at).toLocaleString("en-KE")}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p>
+                        Not set for this shop, so it uses the server's .env settings. Saving here creates
+                        settings for this shop, which then override .env.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className={label}>Environment</label>
                   <select
@@ -1031,6 +1051,8 @@ function ShopsSettingsSection({ setMessage }) {
                   <input
                     className={input}
                     type="password"
+                    autoComplete="off"
+                    placeholder={mpesaSaved?.consumer_key_masked ? `Saved (ends ${mpesaSaved.consumer_key_masked.slice(-4)}). Leave blank to keep` : ""}
                     value={mpesaForm.consumerKey}
                     onChange={(e) => setMpesaForm({ ...mpesaForm, consumerKey: e.target.value })}
                     disabled={mpesaLoading || !isAdmin}
@@ -1041,6 +1063,8 @@ function ShopsSettingsSection({ setMessage }) {
                   <input
                     className={input}
                     type="password"
+                    autoComplete="off"
+                    placeholder={mpesaSaved?.consumer_secret_masked ? `Saved (ends ${mpesaSaved.consumer_secret_masked.slice(-4)}). Leave blank to keep` : ""}
                     value={mpesaForm.consumerSecret}
                     onChange={(e) => setMpesaForm({ ...mpesaForm, consumerSecret: e.target.value })}
                     disabled={mpesaLoading || !isAdmin}
@@ -1051,6 +1075,8 @@ function ShopsSettingsSection({ setMessage }) {
                   <input
                     className={input}
                     type="password"
+                    autoComplete="off"
+                    placeholder={mpesaSaved?.passkey_masked ? `Saved (ends ${mpesaSaved.passkey_masked.slice(-4)}). Leave blank to keep` : ""}
                     value={mpesaForm.passkey}
                     onChange={(e) => setMpesaForm({ ...mpesaForm, passkey: e.target.value })}
                     disabled={mpesaLoading || !isAdmin}
@@ -1108,6 +1134,13 @@ function ShopsSettingsSection({ setMessage }) {
                       Cancel
                     </button>
                   </div>
+                )}
+                {mpesaStatus && (
+                  <p
+                    role={mpesaStatus.ok ? "status" : "alert"}
+                    className={`text-sm font-semibold ${mpesaStatus.ok ? "text-success" : "text-danger"}`}>
+                    {mpesaStatus.text}
+                  </p>
                 )}
                           </form>
                         </td>
