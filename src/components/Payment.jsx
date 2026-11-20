@@ -15,6 +15,7 @@ import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
 import { addPendingMpesaLink, removePendingMpesaLink } from "../lib/mpesaLinks";
 import Checkmark from "./Checkmark";
+import { IconCash, IconDeviceMobile, IconFileInvoice } from "@tabler/icons-react";
 import PromoWinModal from "./PromoWinModal";
 
 const formatKes = (amount) =>
@@ -587,7 +588,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
 
       {mpesaStatus ? (
         <div className="p-4 rounded-2xl bg-surface1 border border-borderColor space-y-3 text-center">
-          <div className="text-4xl">📱</div>
+          <IconDeviceMobile size={40} stroke={1.5} className="mx-auto text-primary" aria-hidden="true" />
           {mpesaStatus === "pending" ? (
             <>
               <p className="text-textPrimary font-semibold text-sm">
@@ -720,7 +721,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="sr-only"
                 />
-                <span className="text-lg">💵</span>
+                <IconCash size={20} stroke={1.75} aria-hidden="true" />
                 <span className="font-semibold text-sm">Cash</span>
               </label>
 
@@ -740,7 +741,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
                   disabled={!isOnline}
                   className="sr-only"
                 />
-                <span className="text-lg">📱</span>
+                <IconDeviceMobile size={20} stroke={1.75} aria-hidden="true" />
                 <span className="font-semibold text-sm">M-Pesa</span>
               </label>
 
@@ -761,7 +762,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
                     disabled={!isOnline}
                     className="sr-only"
                   />
-                  <span className="text-lg">🧾</span>
+                  <IconFileInvoice size={20} stroke={1.75} aria-hidden="true" />
                   <span className="font-semibold text-sm">Charge to Account</span>
                 </label>
               )}

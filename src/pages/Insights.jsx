@@ -128,7 +128,7 @@ export default function Insights({ onNavigate }) {
 
       {!error && !hasAnyInsights && (
         <p className="text-textSecondary text-sm">
-          Nothing to surface yet — insights appear here once there's enough sales/stock activity.
+          Nothing to show yet. Insights appear here once there's enough sales and stock activity.
         </p>
       )}
 

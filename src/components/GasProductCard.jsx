@@ -4,6 +4,7 @@ import { addSaleItem, updateSaleItem } from "../lib/saleOperations";
 import { recordLocalCylinderExchange } from "../lib/db/syncQueue";
 import QuantityStepper from "./QuantityStepper";
 import InventoryBadge from "./InventoryBadge";
+import { IconGasStation } from "@tabler/icons-react";
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount).toLocaleString("en-KE", {
@@ -186,7 +187,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
         });
         onToast(`Cross-brand top-up: KES ${priceAdjustment.toFixed(2)} added to cart.`);
       } else if (isCrossBrand) {
-        onToast("Cross-brand exchange approved — no additional charge.");
+        onToast("Cross-brand exchange approved. No additional charge.");
       } else {
         onToast("Refill with exchange recorded.");
       }
@@ -207,8 +208,8 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
   return (
     <div className="group flex flex-col min-w-0 rounded-2xl bg-surface2 border border-borderColor p-4 shadow-card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-1 hover:border-borderStrong">
       <div className="flex items-start gap-3 mb-3">
-        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-surface1 border border-borderColor text-3xl shrink-0">
-          🛢️
+        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-surface1 border border-borderColor text-primary shrink-0">
+          <IconGasStation size={28} stroke={1.5} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-textPrimary font-bold text-base truncate">
@@ -283,7 +284,7 @@ function GasProductCard({ product, onToast, staffRole, allBrands }) {
           </select>
           {returnBrandId && parseInt(returnBrandId) !== product.brand_id && (
             <p className="text-warning text-xs">
-              Cross-brand exchange{canExemptCrossBrand ? " (approved by " + staffRole + ")" : " — requires admin/supervisor"}
+              Cross-brand exchange{canExemptCrossBrand ? " (approved by " + staffRole + ")" : " (needs admin/supervisor)"}
             </p>
           )}
           <div className="flex gap-2">

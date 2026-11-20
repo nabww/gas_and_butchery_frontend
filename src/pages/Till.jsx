@@ -10,7 +10,7 @@ import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
 import { setOfflineSalesEnabled } from "../lib/settings";
 import ProductCatalog from "../components/ProductCatalog";
-import { IconArrowLeft, IconBuildingStore, IconGasStation, IconShoppingCart } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowLeft, IconBuildingStore, IconGasStation, IconShoppingCart } from "@tabler/icons-react";
 import Cart from "../components/Cart";
 import CustomerSelector from "../components/CustomerSelector";
 import Payment from "../components/Payment";
@@ -258,7 +258,7 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
           <div className="bg-surface2 p-6 rounded-2xl border border-borderColor max-w-sm w-full text-center m-4">
             <h2 className="text-lg font-bold text-textPrimary">Working offline</h2>
             <p className="text-sm text-textSecondary mt-2">
-              The connection to the server was lost. You can keep making sales — they will
+              The connection to the server was lost. You can keep making cash sales; they will
               sync automatically once the connection is restored.
             </p>
             <button
@@ -272,8 +272,9 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
       )}
 
       {isSellingElsewhere && (
-        <div className="selling-elsewhere-banner">
-          ⚠ Selling as {sellingLocationName || `location ${saleLocationOverride}`}. Sales made now will be booked
+        <div className="selling-elsewhere-banner" role="status">
+          <IconAlertTriangle size={16} stroke={2} aria-hidden="true" className="inline align-[-3px] mr-1.5" />
+          Selling as {sellingLocationName || `location ${saleLocationOverride}`}. Sales made now will be booked
           to that branch, not yours.
         </div>
       )}
@@ -379,7 +380,7 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
             <h2 className="text-lg font-bold text-textPrimary">New M-Pesa customer</h2>
             <p className="text-textSecondary text-sm">
               <span className="font-semibold">{pendingConsentCustomer.phone}</span> paid via
-              M-Pesa but isn't registered — no consent is on file to retain their details, so
+              M-Pesa but isn't registered. No consent is on file to retain their details, so
               this record will be auto-purged in 3 months unless registered.
             </p>
             <div className="flex gap-2">

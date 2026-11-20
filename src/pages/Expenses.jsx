@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useActiveLocation } from "../contexts/LocationContext";
 import { getExpenses, createExpense, voidExpense } from "../lib/api";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const weekAgo = () => {
@@ -494,8 +495,12 @@ export default function Expenses() {
     loadExpenses();
   };
 
-  const handleVoid = async (expense) => {
-    if (!window.confirm(`Void expense #${expense.id}? This cannot be undone.`)) return;
+  const [pendingVoid, setPendingVoid] = useState(null);
+
+  const handleVoid = (expense) => setPendingVoid(expense);
+
+  const confirmVoid = async () => {
+    const expense = pendingVoid;
     setVoidingId(expense.id);
     try {
       await voidExpense(expense.id, activeLocationId);
@@ -505,6 +510,7 @@ export default function Expenses() {
       setError(err.message || "Failed to void expense");
     } finally {
       setVoidingId(null);
+      setPendingVoid(null);
     }
   };
 
@@ -707,6 +713,17 @@ export default function Expenses() {
           voidingId={voidingId}
         />
       )}
+
+      <ConfirmDialog
+        open={!!pendingVoid}
+        title={pendingVoid ? `Void expense #${pendingVoid.id}?` : ""}
+        message="Any stock this expense added will be reversed. This can't be undone."
+        confirmLabel="Void expense"
+        danger
+        busy={!!voidingId}
+        onConfirm={confirmVoid}
+        onCancel={() => setPendingVoid(null)}
+      />
     </main>
   );
 }

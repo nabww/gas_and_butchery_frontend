@@ -414,7 +414,7 @@ export default function Reports() {
       const receipt = await getSaleReceipt(saleId);
       printReceipt(receipt);
     } catch (err) {
-      alert(err.message || "Failed to load receipt");
+      setError(err.message || "Failed to load receipt");
     } finally {
       setPrintingSaleIds((prev) => {
         const next = new Set(prev);

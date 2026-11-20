@@ -18,6 +18,7 @@ import {
   getBusinessConfig,
 } from "../lib/api";
 import Checkmark from "../components/Checkmark";
+import { IconX } from "@tabler/icons-react";
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount || 0).toLocaleString("en-KE", {
@@ -740,8 +741,9 @@ function PaymentModal({ open, invoiceId, amountDue, onClose, onSubmit, status })
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="text-textMuted hover:text-textPrimary text-sm disabled:opacity-50">
-            ✕
+            aria-label="Close"
+            className="w-10 h-10 -mr-2 -mt-2 flex items-center justify-center rounded-lg text-textMuted hover:text-textPrimary hover:bg-surface3 disabled:opacity-50">
+            <IconX size={18} stroke={2} aria-hidden="true" />
           </button>
         </div>
 
@@ -1440,7 +1442,7 @@ function AccountDetail({ account, onUpdated, onClose, businessConfig }) {
         <div className="space-y-1 mb-2">
           {pricing.length === 0 && (
             <p className="text-textMuted text-xs">
-              No custom prices set — standard pricing applies.
+              No custom prices set. Standard pricing applies.
             </p>
           )}
           {pricing.map((p) => (
@@ -1662,8 +1664,8 @@ export default function CorporateAccountsAdmin() {
         Corporate Accounts
       </h1>
       <p className="text-textSecondary text-sm mt-1">
-        Credit limits and custom pricing are set individually per client —
-        nothing here is shared or uniform across accounts.
+        Credit limits and custom pricing are set individually per client.
+        Nothing here is shared or uniform across accounts.
       </p>
 
       {error && (

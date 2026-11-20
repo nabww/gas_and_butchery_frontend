@@ -9,6 +9,7 @@ import { useToast } from "../lib/useToast";
 import GasProductCard from "./GasProductCard";
 import RetailProductCard from "./RetailProductCard";
 import CategoryPills from "./CategoryPills";
+import { IconFlame, IconRefresh, IconSearch } from "@tabler/icons-react";
 
 const DEFAULT_BUSINESSES = ["butchery", "gas"];
 
@@ -163,14 +164,18 @@ export default function ProductCatalog({
         )}
 
         <div className="relative flex gap-2">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted text-lg">
-            🔍
-          </span>
+          <IconSearch
+            size={18}
+            stroke={2}
+            aria-hidden="true"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-textMuted pointer-events-none"
+          />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={`Search ${businessLabels[businessType] || businessType} products...`}
+            aria-label="Search products"
             className="flex-1 pl-11 pr-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
           <button
@@ -179,9 +184,9 @@ export default function ProductCatalog({
             disabled={loading}
             aria-label="Refresh stock"
             title="Refresh stock"
-            className="px-3 sm:px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors whitespace-nowrap shrink-0">
-            <span aria-hidden="true" className={loading ? "inline-block animate-spin" : ""}>↻</span>
-            <span className="hidden sm:inline">{loading ? " Refreshing…" : " Refresh stock"}</span>
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-3 rounded-xl bg-surface2 border border-borderColor text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary disabled:opacity-50 transition-colors whitespace-nowrap shrink-0">
+            <IconRefresh size={18} stroke={2} aria-hidden="true" className={loading ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">{loading ? "Refreshing…" : "Refresh stock"}</span>
           </button>
         </div>
       </div>
@@ -209,7 +214,7 @@ export default function ProductCatalog({
             {[...cylinderBrands.entries()].map(([brand, brandItems]) => (
               <section key={brand}>
                 <h2 className="text-textPrimary text-xl font-bold mb-4 flex items-center gap-2">
-                  <span>🔥</span>
+                  <IconFlame size={22} stroke={1.75} className="text-warning" aria-hidden="true" />
                   <span>{brand}</span>
                 </h2>
                 {/* Sized to the pane's actual width, not the viewport --

@@ -109,7 +109,7 @@ function RegisterForm({ prefillPhone, onRegistered, onCancel }) {
         />
         <span>
           Customer consents to their phone number/name being retained for loyalty, receipts, and
-          reporting (required — Data Protection Act).
+          reporting (required by the Data Protection Act).
         </span>
       </label>
       <label className="md:col-span-2 flex items-center gap-2 text-xs text-textSecondary">
@@ -226,7 +226,7 @@ function CustomerDetail({ customer, onUpdated, onClose }) {
           {customer.consent_given_at
             ? `Consent given ${formatDate(customer.consent_given_at)}. Retained indefinitely.`
             : customer.registered_via === "mpesa_auto"
-              ? "No consent on file — auto-registered from an M-Pesa payment. Subject to the 3-month void / 6-month purge retention job unless consent is granted."
+              ? "No consent on file. Auto-registered from an M-Pesa payment. Subject to the 3-month void / 6-month purge retention job unless consent is granted."
               : "No consent on file."}
         </p>
         <div className="flex gap-2">

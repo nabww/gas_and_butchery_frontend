@@ -3,6 +3,27 @@ import { useTheme } from '../lib/useTheme';
 import { useActiveLocation } from '../contexts/LocationContext';
 import { MODULE_CATALOG, effectiveModules } from '../lib/modules';
 import { getBusinessConfig, listRefillRequests } from '../lib/api';
+import {
+  IconBuildingSkyscraper,
+  IconBuildingStore,
+  IconCashRegister,
+  IconChartBar,
+  IconChevronDown,
+  IconGift,
+  IconIdBadge2,
+  IconLayoutDashboard,
+  IconLogout,
+  IconMapPin,
+  IconMoon,
+  IconPackage,
+  IconReceipt,
+  IconSettings,
+  IconShieldCheck,
+  IconSpeakerphone,
+  IconSun,
+  IconUsers,
+  IconX,
+} from '@tabler/icons-react';
 
 function HamburgerIcon({ open, size = 20 }) {
   return (
@@ -53,7 +74,7 @@ const nameInitials = (name) =>
 // Shop switcher — admins can always switch shops; a supervisor only sees
 // this if explicitly granted `can_switch_location` (per-staff override,
 // same pattern as can_redeem_points). Cashiers never see it.
-function LocationSwitcher({ locations, activeLocationId, onChange }) {
+function LocationSwitcher({ locations, activeLocationId, onChange, fullWidth = false }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -71,27 +92,32 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
   const active = locations.find((loc) => String(loc.id) === String(activeLocationId));
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', marginLeft: 8 }}>
+    <div ref={wrapperRef} style={{ position: 'relative', marginLeft: fullWidth ? 0 : 8 }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Switch active shop"
+        aria-expanded={open}
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '5px 10px',
-          borderRadius: 7,
+          gap: fullWidth ? 8 : 6,
+          width: fullWidth ? '100%' : 'auto',
+          minHeight: fullWidth ? 44 : undefined,
+          padding: fullWidth ? '8px 12px' : '5px 10px',
+          borderRadius: fullWidth ? 10 : 7,
           border: '0.5px solid var(--border-accent)',
-          background: 'transparent',
-          color: 'var(--text-muted)',
-          fontSize: 12,
+          background: fullWidth ? 'var(--surface-1)' : 'transparent',
+          color: fullWidth ? 'var(--text-primary)' : 'var(--text-muted)',
+          fontSize: fullWidth ? 14 : 12,
           cursor: 'pointer',
         }}
       >
-        <span aria-hidden="true">🏬</span>
-        <span>{active?.name || 'All locations'}</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>▾</span>
+        <IconBuildingStore size={fullWidth ? 16 : 14} stroke={1.75} aria-hidden="true" />
+        <span style={{ flex: fullWidth ? 1 : undefined, textAlign: 'left' }}>
+          {active?.name || 'All locations'}
+        </span>
+        <IconChevronDown size={fullWidth ? 16 : 12} stroke={2} aria-hidden="true" />
       </button>
 
       {open && (
@@ -100,6 +126,7 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
             position: 'absolute',
             top: 'calc(100% + 4px)',
             left: 0,
+            right: fullWidth ? 0 : undefined,
             minWidth: 180,
             background: 'var(--surface-2)',
             border: '0.5px solid var(--border)',
@@ -129,7 +156,9 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
               cursor: 'pointer',
             }}
           >
-            <span aria-hidden="true">{!activeLocationId ? '📍' : '🏬'}</span>
+            {!activeLocationId
+              ? <IconMapPin size={14} stroke={1.75} aria-hidden="true" />
+              : <IconBuildingStore size={14} stroke={1.75} aria-hidden="true" />}
             All locations
           </button>
           <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 0' }} />
@@ -157,7 +186,9 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
                   cursor: 'pointer',
                 }}
               >
-                <span aria-hidden="true">{isActive ? '📍' : '🏪'}</span>
+                {isActive
+                  ? <IconMapPin size={14} stroke={1.75} aria-hidden="true" />
+                  : <IconBuildingStore size={14} stroke={1.75} aria-hidden="true" />}
                 {loc.name}
               </button>
             );
@@ -168,23 +199,46 @@ function LocationSwitcher({ locations, activeLocationId, onChange }) {
   );
 }
 
+const MODULE_ICONS = {
+  dashboard: IconLayoutDashboard,
+  till: IconCashRegister,
+  reports: IconChartBar,
+  customers: IconUsers,
+  staff: IconIdBadge2,
+  catalog: IconPackage,
+  expenses: IconReceipt,
+  rewards: IconGift,
+  promotions: IconSpeakerphone,
+  corporate: IconBuildingSkyscraper,
+  settings: IconSettings,
+  overrides: IconShieldCheck,
+};
+
 function NavItem({ item, currentPath, onClick, onBadgeClick, mobile, badge }) {
   const active = currentPath === item.path || currentPath?.startsWith(`${item.path}?`);
+  const Icon = mobile ? MODULE_ICONS[item.key] : null;
   return (
     <button
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
       style={{
         position: 'relative',
         border: 'none',
         background: active ? 'var(--bg-accent)' : 'transparent',
         color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
-        padding: '8px 12px',
+        padding: mobile ? '0 12px' : '8px 12px',
+        minHeight: mobile ? 44 : undefined,
+        display: mobile ? 'flex' : undefined,
+        alignItems: 'center',
+        gap: 12,
         fontSize: mobile ? 14 : 13,
+        fontWeight: mobile && active ? 600 : undefined,
         textAlign: mobile ? 'left' : 'center',
         width: mobile ? '100%' : 'auto',
-        borderRadius: 6,
+        borderRadius: mobile ? 10 : 6,
       }}
     >
+      {Icon && <Icon size={19} stroke={1.75} aria-hidden="true" style={{ flexShrink: 0 }} />}
       {item.label}
       {badge > 0 && (
         <span
@@ -200,8 +254,8 @@ function NavItem({ item, currentPath, onClick, onBadgeClick, mobile, badge }) {
             height: 16,
             padding: '0 4px',
             borderRadius: 999,
-            background: 'var(--danger, #e55353)',
-            color: '#fff',
+            background: 'var(--status-error)',
+            color: 'var(--on-primary)',
             fontSize: 10,
             fontWeight: 700,
             display: 'inline-flex',
@@ -232,6 +286,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
   // currently active one just got deactivated, it still shows as the
   // current selection until the admin explicitly switches away from it.
   const switchableLocations = locations.filter((loc) => loc.is_active);
+  const activeLocationName = locations.find((loc) => String(loc.id) === String(activeLocationId))?.name;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [businessConfig, setBusinessConfig] = useState(null);
@@ -394,7 +449,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               src={businessConfig.business_logo_url}
               alt={businessConfig?.business_name || 'TeziPOS'}
               className="business-logo-adaptive"
-              style={{ height: 60, maxWidth: 180, objectFit: 'contain' }}
+              style={{ height: 36, maxWidth: 140, objectFit: 'contain', display: 'block' }}
             />
           ) : (
             businessConfig?.business_name || 'TeziPOS'
@@ -485,6 +540,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             }}
           >
             <span
+              role="img"
+              aria-label={`Signed in as ${staff.name}`}
+              title={`${staff.name} (${staff.role})`}
               style={{
                 width: 26,
                 height: 26,
@@ -498,12 +556,10 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                cursor: 'default',
               }}
             >
               {nameInitials(staff.name)}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-              {staff.name}
             </span>
           </div>
           <button
@@ -548,26 +604,30 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           >
             <HamburgerIcon open={mobileOpen} size={22} />
           </button>
-          <button
-            type="button"
-            onClick={onSignOut}
-            title="Sign out"
-            aria-label="Sign out"
+          {/* Initials only here: a sign-out button right next to the menu
+              toggle was one mis-tap from logging the cashier out mid-sale.
+              Sign out lives at the bottom of the menu instead. */}
+          <span
+            role="img"
+            aria-label={`Signed in as ${staff.name}`}
+            title={`${staff.name} (${staff.role})`}
             style={{
-              border: '0.5px solid var(--border)',
-              background: 'var(--surface-1)',
-              color: 'var(--danger, #e55353)',
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               borderRadius: '50%',
-              cursor: 'pointer',
+              background: 'var(--surface-3)',
+              color: 'var(--text-secondary)',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 0.5,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}
           >
-            <PowerIcon />
-          </button>
+            {nameInitials(staff.name)}
+          </span>
         </div>
       </div>
 
@@ -578,9 +638,9 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
             marginTop: 8,
             padding: '8px 12px',
             borderRadius: 8,
-            background: 'rgba(45, 180, 100, 0.12)',
-            border: '0.5px solid #2db464',
-            color: '#2db464',
+            background: 'color-mix(in srgb, var(--status-success) 12%, transparent)',
+            border: '0.5px solid var(--status-success)',
+            color: 'var(--status-success)',
             fontSize: 13,
             fontWeight: 600,
             display: 'flex',
@@ -591,7 +651,7 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
           }}
         >
           <span>
-            {refillFulfilled} refill request{refillFulfilled === 1 ? '' : 's'} fulfilled — cylinders on the way back to this shop.
+            {refillFulfilled} refill request{refillFulfilled === 1 ? '' : 's'} fulfilled. Cylinders are on the way back to this shop.
           </span>
           {(staff.role === 'admin' || staff.role === 'supervisor') && (
             <button
@@ -599,8 +659,8 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               onClick={() => handleNav('/catalog?tab=refill-requests')}
               style={{
                 border: 'none',
-                background: '#2db464',
-                color: '#fff',
+                background: 'var(--status-success)',
+                color: 'var(--on-primary)',
                 fontSize: 11,
                 fontWeight: 700,
                 padding: '4px 10px',
@@ -618,18 +678,20 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               setDismissedFulfilled(refillFulfilled);
             }}
             title="Dismiss"
+            aria-label="Dismiss"
             style={{
               border: 'none',
               background: 'none',
-              color: '#2db464',
-              fontSize: 15,
-              fontWeight: 700,
+              color: 'var(--status-success)',
               cursor: 'pointer',
-              lineHeight: 1,
-              padding: '0 2px',
+              width: 32,
+              height: 32,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            ×
+            <IconX size={16} stroke={2} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -665,9 +727,100 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               padding: '16px',
               boxShadow: '-8px 0 24px rgba(0,0,0,0.2)',
               overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <div className="space-y-2 mb-4">
+            {/* Who is signed in, and where -- the two things a cashier
+                needs to confirm before ringing anything up. */}
+            <div
+              style={{
+                padding: 12,
+                marginBottom: 12,
+                borderRadius: 12,
+                background: 'var(--surface-1)',
+                border: '0.5px solid var(--border)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: 'var(--bg-accent)',
+                    color: 'var(--text-accent)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {nameInitials(staff.name)}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {staff.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                    {staff.role}
+                    {!showLocationSwitcher && activeLocationName ? ` · ${activeLocationName}` : ''}
+                  </div>
+                </div>
+              </div>
+              {showLocationSwitcher && switchableLocations.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <LocationSwitcher
+                    fullWidth
+                    locations={switchableLocations}
+                    activeLocationId={activeLocationId}
+                    onChange={(id) => {
+                      setMobileOpen(false);
+                      setActiveLocationId(id);
+                    }}
+                  />
+                </div>
+              )}
+              {showQuickSell && currentPath !== '/till' && (
+                <button
+                  type="button"
+                  onClick={() => handleNav('/till')}
+                  style={{
+                    marginTop: 8,
+                    width: '100%',
+                    minHeight: 44,
+                    border: 'none',
+                    borderRadius: 10,
+                    background: 'var(--primary)',
+                    color: 'var(--on-primary)',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <IconCashRegister size={18} stroke={1.75} aria-hidden="true" /> Open till
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {items.map((item) => (
                 <NavItem
                   key={item.path}
@@ -681,99 +834,60 @@ export default function RoleNav({ staff, currentPath, onNavigate, onSignOut }) {
               ))}
             </div>
 
-            {showLocationSwitcher && switchableLocations.length > 0 && (
-              <div className="sm:hidden pb-4 mb-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                <LocationSwitcher
-                  locations={switchableLocations}
-                  activeLocationId={activeLocationId}
-                  onChange={(id) => {
-                    setMobileOpen(false);
-                    setActiveLocationId(id);
-                  }}
-                />
-              </div>
-            )}
-
+            {/* Pinned to the bottom so it never sits mid-list, and kept
+                away from the menu toggle so it can't be hit by accident. */}
             <div
-              className="flex flex-col items-stretch gap-2 pt-4 mt-2"
-              style={{ borderTop: '0.5px solid var(--border)' }}
+              style={{
+                marginTop: 'auto',
+                paddingTop: 12,
+                borderTop: '0.5px solid var(--border)',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+              }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'var(--surface-3)',
-                    color: 'var(--text-secondary)',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  {nameInitials(staff.name)}
-                </span>
-                <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
-                  {staff.name}
-                </span>
-              </div>
-              {showQuickSell && currentPath !== '/till' && (
-                <button
-                  onClick={() => handleNav('/till')}
-                  style={{
-                    alignSelf: 'flex-start',
-                    border: '0.5px solid var(--border)',
-                    background: 'var(--surface-1)',
-                    color: 'var(--text-accent)',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: '6px 14px',
-                    borderRadius: 999,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Sell
-                </button>
-              )}
               <button
+                type="button"
                 onClick={toggleTheme}
                 style={{
-                  border: 'none',
-                  background: 'none',
-                  fontSize: 12,
-                  color: 'var(--text-muted)',
+                  minHeight: 44,
+                  border: '0.5px solid var(--border)',
+                  borderRadius: 10,
+                  background: 'var(--surface-1)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 500,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 8,
-                  padding: '6px 2px',
-                  alignSelf: 'flex-start',
                 }}
               >
-                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                {theme === 'dark'
+                  ? <IconSun size={17} stroke={1.75} aria-hidden="true" />
+                  : <IconMoon size={17} stroke={1.75} aria-hidden="true" />}
+                {theme === 'dark' ? 'Light' : 'Dark'}
               </button>
               <button
+                type="button"
                 onClick={onSignOut}
                 style={{
-                  alignSelf: 'flex-start',
+                  minHeight: 44,
                   border: '0.5px solid var(--border)',
-                  background: 'transparent',
-                  color: 'var(--text-muted)',
-                  fontSize: 12,
-                  padding: '6px 12px',
-                  borderRadius: 7,
+                  borderRadius: 10,
+                  background: 'var(--surface-1)',
+                  color: 'var(--status-error)',
+                  fontSize: 13,
+                  fontWeight: 600,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                <PowerIcon size={13} /> Sign out
+                <IconLogout size={17} stroke={1.75} aria-hidden="true" /> Sign out
               </button>
             </div>
           </div>

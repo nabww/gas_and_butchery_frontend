@@ -270,7 +270,7 @@ export default function RewardsAdmin() {
               onClick={() => setSelectedPayout(p)}
               className="w-full p-3 rounded-xl bg-surface2 border border-borderColor flex justify-between items-center text-sm text-left hover:border-borderStrong hover:bg-surface3 transition-all">
               <span className="text-textPrimary">
-                {p.customer_name || p.customer_phone || "Customer"} —{" "}
+                {p.customer_name || p.customer_phone || "Customer"}:{" "}
                 {p.reward_name || "Reward"} (KES{" "}
                 {Number(p.cost_value || 0).toFixed(2)})
                 <span className="text-textSecondary text-xs ml-2">

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { IconConfetti } from "@tabler/icons-react";
 
 const formatKes = (amount) =>
   `KES ${Number(amount || 0).toLocaleString("en-KE", {
@@ -42,7 +43,7 @@ export default function PromoWinModal({ wins, customerName, onClose, onConfirm }
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-md rounded-2xl bg-surface1 text-textPrimary shadow-2xl border border-borderColor p-5">
         <div className="text-center mb-4">
-          <div className="text-4xl mb-2">🎉</div>
+          <IconConfetti size={44} stroke={1.5} className="mx-auto mb-2 text-success" aria-hidden="true" />
           <h3 className="text-lg font-bold text-textPrimary">
             Congratulations {customerName || "Customer"}!
           </h3>

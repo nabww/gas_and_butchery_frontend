@@ -16,6 +16,7 @@ import {
   getInventoryValue,
 } from "../lib/api";
 import PayoutActionModal from "../components/PayoutActionModal";
+import { IconAlertTriangle } from "@tabler/icons-react";
 
 const formatKes = (amount) =>
   `KES ${Number(amount || 0).toLocaleString("en-KE", {
@@ -128,9 +129,12 @@ function KpiCard({ label, value, subtext, tone = "default", warning }) {
       <p className="text-textSecondary text-xs font-medium uppercase tracking-wide">
         {label}
         {warning && (
-          <span className="ml-1 text-warning normal-case" title={warning}>
-            ⚠
-          </span>
+          <IconAlertTriangle
+            size={14}
+            stroke={2}
+            className="ml-1 inline align-[-2px] text-warning"
+            aria-label="Warning"
+          />
         )}
       </p>
       <p className={`text-2xl font-bold mt-1 ${textTone[tone]}`}>{value}</p>
@@ -437,7 +441,7 @@ export default function Dashboard({ onNavigate }) {
       items.push("No revenue was recorded in the selected period, though the previous equivalent period had sales.");
     }
     if (lowStock.length > 0) {
-      items.push(`${lowStock.length} item(s) at or below their low-stock threshold — consider restocking.`);
+      items.push(`${lowStock.length} item(s) at or below their low-stock threshold. Consider restocking.`);
     }
     if (oversells.length > 0) {
       items.push(`${oversells.length} unresolved oversell(s) need admin review and stock correction.`);
@@ -450,7 +454,7 @@ export default function Dashboard({ onNavigate }) {
     }
     if (discounts > revenue * 0.15) {
       items.push(
-        "Manual and approved discounts in the selected period exceed 15% of revenue — review discount patterns.",
+        "Manual and approved discounts in the selected period exceed 15% of revenue. Review discount patterns.",
       );
     }
     if (mpesa > 0 && mpesa + cash + account === 0) {
@@ -526,7 +530,7 @@ export default function Dashboard({ onNavigate }) {
 
       {!activeLocationId && (
         <div className="mb-4 p-3 rounded-xl bg-warning/10 text-warning text-sm">
-          You are viewing data for <strong>all locations</strong>. This view is read-only — select a shop to record sales, expenses, or transfers.
+          You are viewing data for <strong>all locations</strong>. This view is read-only. Select a shop to record sales, expenses, or transfers.
         </div>
       )}
 
@@ -632,7 +636,7 @@ export default function Dashboard({ onNavigate }) {
             subtext: "Cost of goods sold in selected period",
             warning:
               oversells.length > 0
-                ? "Unresolved oversells — margins may be off until stock is corrected"
+                ? "Unresolved oversells: margins may be off until stock is corrected"
                 : null,
           },
           {
@@ -662,7 +666,7 @@ export default function Dashboard({ onNavigate }) {
             subtext: "Current stock value at landed cost",
             warning:
               oversells.length > 0
-                ? "Unresolved oversells — value may be off until stock is corrected"
+                ? "Unresolved oversells: value may be off until stock is corrected"
                 : null,
           },
           {
@@ -771,7 +775,7 @@ export default function Dashboard({ onNavigate }) {
       <section ref={rewardsSectionRef} className="rounded-2xl bg-surface2 border border-borderColor p-5 mt-6 scroll-mt-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-textPrimary font-bold">
-            Pending rewards & cashback{activeLocationId ? ` — ${activeLocationName}` : ""}
+            Pending rewards & cashback{activeLocationId ? ` · ${activeLocationName}` : ""}
           </h2>
           <span className="text-textSecondary text-xs">
             {pendingRewards.length} awaiting action
@@ -789,7 +793,7 @@ export default function Dashboard({ onNavigate }) {
                 className="w-full p-3 rounded-xl bg-surface1 border border-borderColor flex justify-between items-center text-sm text-left hover:border-borderStrong hover:bg-surface3 transition-all"
               >
                 <span className="text-textPrimary">
-                  {p.customer_name || p.customer_phone || "Customer"} —{" "}
+                  {p.customer_name || p.customer_phone || "Customer"}:{" "}
                   {p.type === "cashback"
                     ? `Cashback KES ${Number(p.cashback_amount || 0).toFixed(2)}`
                     : p.reward_name || "Reward"}{" "}

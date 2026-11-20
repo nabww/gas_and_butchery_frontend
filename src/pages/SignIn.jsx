@@ -187,7 +187,7 @@ export default function SignIn({ onSignedIn, businessName = "George's Butchery &
             color: 'var(--text-secondary)',
           }}
         >
-          <span>{navigator.onLine ? 'Online' : 'Offline — queued locally'}</span>
+          <span>{navigator.onLine ? 'Online' : 'Offline: sales are queued on this device'}</span>
           <span style={{ margin: '0 4px' }}>·</span>
           <button
             onClick={toggleTheme}

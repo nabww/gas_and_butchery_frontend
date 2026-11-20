@@ -43,15 +43,15 @@ const inputClass =
 // Butchery products can draw from a shared stock pool instead of their own
 // stock row — e.g. mixed beef, steak and mince all deduct from 'beef'.
 const POOL_OPTIONS = [
-  { value: "beef", label: "Beef — meat & bones (kg)" },
-  { value: "organs", label: "Organs — liver, kidney, heart (kg)" },
+  { value: "beef", label: "Beef: meat & bones (kg)" },
+  { value: "organs", label: "Organs: liver, kidney, heart (kg)" },
   { value: "tongue", label: "Tongue (kg)" },
   { value: "matumbo", label: "Matumbo (kg)" },
   { value: "lungs", label: "Lungs (kg)" },
   { value: "heads", label: "Heads (pieces)" },
   { value: "legs", label: "Legs (pieces)" },
   { value: "goat", label: "Goat meat (kg)" },
-  { value: "goat_organs", label: "Goat organs — liver, kidney, heart (kg)" },
+  { value: "goat_organs", label: "Goat organs: liver, kidney, heart (kg)" },
   { value: "goat_tongue", label: "Goat tongue (kg)" },
   { value: "goat_matumbo", label: "Goat matumbo (kg)" },
   { value: "goat_lungs", label: "Goat lungs (kg)" },
@@ -137,7 +137,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
     // Added stock always has a cost — require it so stock can't enter the
     // books valueless; reductions are count corrections.
     if (addedQty > 0 && !(Number(stockTakeCost) > 0)) {
-      setError("Enter what each added unit cost — added stock is an expense");
+      setError("Enter what each added unit cost. Added stock is recorded as a purchase");
       return;
     }
     const capturesExpense = addedQty > 0 && !poolKey;
@@ -273,7 +273,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
             </select>
             {poolKey && (
               <p className="text-textMuted text-xs mt-1">
-                Sales deduct from this branch's shared {poolKey} pool — quantity comes from slaughter records, not this form.
+                Sales deduct from this branch's shared {poolKey} pool. Quantity comes from slaughter records, not this form.
               </p>
             )}
           </div>
@@ -329,7 +329,7 @@ function ProductForm({ editing, onSaved, onCancel }) {
             {previewAdded > 0 && (
               <div className="md:col-span-2">
                 <label className="text-textMuted text-xs block mb-1">
-                  Cost per added unit — {previewAdded} added (KES)
+                  Cost per added unit ({previewAdded} added, KES)
                 </label>
                 <input
                   className={inputClass}
@@ -338,12 +338,12 @@ function ProductForm({ editing, onSaved, onCancel }) {
                   step="0.01"
                   value={stockTakeCost}
                   onChange={(e) => setStockTakeCost(e.target.value)}
-                  placeholder="Required — what you paid per unit"
+                  placeholder="Required: what you paid per unit"
                 />
                 <p className="text-textMuted text-xs mt-1">
                   The added quantity posts an opening-stock expense and sets
                   the stock's average cost. Reducing the count is a
-                  correction — no expense.
+                  correction, with no expense.
                 </p>
               </div>
             )}
@@ -496,7 +496,7 @@ function GasStockRow({
         empty_qty: emptyN,
         notes: lossNote || undefined,
       });
-      onToast(`Loss declared — KES ${Number(result.loss_value).toLocaleString("en-KE")} written off.`);
+      onToast(`Loss declared. KES ${Number(result.loss_value).toLocaleString("en-KE")} written off.`);
       setDeclaring(false);
       setFilledLost("0");
       setEmptyLost("0");
@@ -769,7 +769,7 @@ function CatalogTab({ staffRole }) {
               Oversell flags ({oversells.length})
             </h3>
             <p className="text-textMuted text-xs mt-0.5">
-              Pool items sold past recorded stock — usually a counting discrepancy.
+              Pool items sold past recorded stock, usually a counting discrepancy.
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -1151,7 +1151,7 @@ function GasStockTab({ staffRole, focusId }) {
             Oversell flags ({oversells.length})
           </h2>
           <p className="text-textSecondary text-sm mb-4">
-            Sales that exceeded available stock — review and reconcile.
+            Sales that exceeded available stock. Review and reconcile.
           </p>
           <div className="rounded-2xl bg-surface2 border border-borderColor overflow-hidden">
             <table className="w-full">
@@ -1803,7 +1803,7 @@ function RefillRequestsTab({ staffRole }) {
           <div>
             <h2 className="text-textPrimary font-bold">New refill request</h2>
             <p className="text-textMuted text-xs mt-1">
-              Links the full round-trip — empties to the store, filled cylinders back — so both sides can track status.
+              Links the full round trip (empties to the store, filled cylinders back) so both sides can track status.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1872,7 +1872,7 @@ function RefillRequestsTab({ staffRole }) {
           <label className="text-xs text-textSecondary block">Notes
             <input className={`${inputClass} mt-1`} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} disabled={saving} />
           </label>
-          {stockStores.length === 0 && <p className="text-warning text-xs">No shop is marked as a Stock store — set one under Settings → Shops first.</p>}
+          {stockStores.length === 0 && <p className="text-warning text-xs">No shop is marked as a Stock store. Set one under Settings → Shops first.</p>}
           <div className="flex items-center gap-3">
             <button type="submit" disabled={saving || stockStores.length === 0 || Boolean(validateForm())} className="px-4 py-2 rounded-lg bg-primary text-onPrimary text-sm font-semibold disabled:opacity-50">
               {saving ? "Creating…" : "Create request"}
@@ -2049,7 +2049,7 @@ function LivestockTab() {
       await slaughterAnimal(animal.id, payload);
       setSlaughteringId(null);
       setSlaughterForm({});
-      setMessage("Slaughter recorded — stock pools updated.");
+      setMessage("Slaughter recorded. Stock pools updated.");
       await load();
     } catch (err) {
       setMessage(err.message || "Failed to record slaughter");
@@ -2106,7 +2106,7 @@ function LivestockTab() {
             </label>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-textSecondary">Extra costs (transport, slaughter fee, etc.) — added to the animal's cost</label>
+            <label className="text-sm font-semibold text-textSecondary">Extra costs (transport, slaughter fee, etc.), added to the animal's cost</label>
             {extras.map((line, index) => (
               <div key={index} className="flex gap-2">
                 <input className={`${inputClass} flex-1 min-w-0`} placeholder="Description" value={line.description} onChange={(e) => setExtras((prev) => prev.map((l, i) => (i === index ? { ...l, description: e.target.value } : l)))} disabled={saving} />
@@ -2164,7 +2164,7 @@ function LivestockTab() {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {KG_OUTPUTS.map(([key, label]) => (
                               <label key={key} className="text-xs text-textSecondary">
-                                {key === "meat" ? (animal.animal_type === "goat" ? "Goat meat" : "Beef — meat & bones") : label} (kg)
+                                {key === "meat" ? (animal.animal_type === "goat" ? "Goat meat" : "Beef: meat & bones") : label} (kg)
                                 <input className={`${inputClass} mt-1`} type="number" min="0" step="0.001" value={slaughterForm[`${key}_kg`] ?? ""} placeholder="0" onChange={(e) => setSlaughterForm((prev) => ({ ...prev, [`${key}_kg`]: e.target.value }))} disabled={saving} />
                               </label>
                             ))}

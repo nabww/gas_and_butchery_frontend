@@ -8,6 +8,7 @@ import { useCart } from "../contexts/CartContext";
 import { getCustomerPoints, getLoyaltyConfig, getRewards, redeemReward } from "../lib/api";
 import { redeemLocalPoints } from "../lib/db/syncQueue";
 import QuantityStepper from "./QuantityStepper";
+import { IconShoppingCart, IconX } from "@tabler/icons-react";
 
 const formatKes = (amount) =>
   `KES ${parseFloat(amount).toLocaleString("en-KE", {
@@ -17,10 +18,12 @@ const formatKes = (amount) =>
 
 const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [itemError, setItemError] = useState("");
 
   const handleQtyChange = async (qty) => {
     if (!Number.isFinite(qty) || qty <= 0) return;
     setIsUpdating(true);
+    setItemError("");
     try {
       await updateSaleItem(
         item.local_id || item.id,
@@ -30,18 +33,19 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
       );
       onUpdate(item.id, qty);
     } catch (err) {
-      alert(err.message || "Failed to update quantity");
+      setItemError(err.message || "Failed to update quantity");
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleRemove = async () => {
+    setItemError("");
     try {
       await removeSaleItem(item.local_id || item.id, saleId);
       onRemove(item.id);
     } catch (err) {
-      alert(err.message || "Failed to remove item");
+      setItemError(err.message || "Failed to remove item");
     }
   };
 
@@ -69,14 +73,18 @@ const CartItem = memo(function CartItem({ item, saleId, onUpdate, onRemove }) {
             {formatKes(item.line_total)}
           </p>
           <button
+            type="button"
             onClick={handleRemove}
             title="Remove item"
             aria-label={`Remove ${item.product_name}`}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors text-sm shrink-0">
-            ✕
+            className="w-10 h-10 flex items-center justify-center rounded-lg text-textMuted hover:text-danger hover:bg-danger/10 transition-colors shrink-0">
+            <IconX size={18} stroke={2} aria-hidden="true" />
           </button>
         </div>
       </div>
+      {itemError && (
+        <p className="text-danger text-xs font-semibold" role="alert">{itemError}</p>
+      )}
     </div>
   );
 });
@@ -98,6 +106,7 @@ export default function Cart({ canRedeemPoints }) {
   const [showDiscountUI, setShowDiscountUI] = useState(false);
   const [discountInput, setDiscountInput] = useState("");
   const [discountType, setDiscountType] = useState("fixed");
+  const [discountError, setDiscountError] = useState("");
   const [showRedeemUI, setShowRedeemUI] = useState(false);
   const [redeemInput, setRedeemInput] = useState("");
   const [pointsBalance, setPointsBalance] = useState(null);
@@ -114,6 +123,7 @@ export default function Cart({ canRedeemPoints }) {
   useEffect(() => {
     setShowDiscountUI(false);
     setDiscountInput("");
+    setDiscountError("");
     setShowRedeemUI(false);
     setRedeemInput("");
     setRedeemError("");
@@ -187,7 +197,7 @@ export default function Cart({ canRedeemPoints }) {
   const handleApplyDiscount = async () => {
     const amount = parseFloat(discountInput);
     if (isNaN(amount) || amount < 0) {
-      alert("Invalid discount amount");
+      setDiscountError("Enter a valid discount amount");
       return;
     }
 
@@ -197,17 +207,18 @@ export default function Cart({ canRedeemPoints }) {
     }
 
     if (finalDiscount > subtotal) {
-      alert("Discount exceeds subtotal");
+      setDiscountError("Discount can't be more than the subtotal");
       return;
     }
 
+    setDiscountError("");
     try {
       await applySaleDiscount(saleId, saleLocalId, finalDiscount);
       applyDiscount(finalDiscount);
       setShowDiscountUI(false);
       setDiscountInput("");
     } catch (err) {
-      alert(err.message || "Failed to apply discount");
+      setDiscountError(err.message || "Failed to apply discount");
     }
   };
 
@@ -230,7 +241,7 @@ export default function Cart({ canRedeemPoints }) {
 
       {items.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-textMuted py-8">
-          <span className="text-4xl mb-3">🛒</span>
+          <IconShoppingCart size={40} stroke={1.5} className="mb-3" aria-hidden="true" />
           <p className="text-sm font-medium">Cart is empty</p>
           <p className="text-xs mt-1">Add products to get started</p>
         </div>
@@ -290,6 +301,9 @@ export default function Cart({ canRedeemPoints }) {
                     <option value="percentage">%</option>
                   </select>
                 </div>
+                {discountError && (
+                  <p className="text-danger text-xs font-semibold" role="alert">{discountError}</p>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={handleApplyDiscount}
@@ -297,7 +311,7 @@ export default function Cart({ canRedeemPoints }) {
                     Apply
                   </button>
                   <button
-                    onClick={() => setShowDiscountUI(false)}
+                    onClick={() => { setShowDiscountUI(false); setDiscountError(""); }}
                     className="flex-1 py-2 rounded-xl border border-borderColor bg-surface2 text-textSecondary text-sm font-semibold hover:bg-surface3 hover:text-textPrimary transition-colors active:scale-[0.98]">
                     Cancel
                   </button>
@@ -367,7 +381,7 @@ export default function Cart({ canRedeemPoints }) {
                   <div className="flex justify-between text-xs text-textMuted"><span>Rewards catalogue</span><span>{pointsBalance} pts available</span></div>
                   {rewards.filter((reward) => reward.stock_qty > 0).map((reward) => (
                     <button key={reward.id} onClick={() => handleRewardRedeem(reward)} disabled={rewardLoading || pointsBalance < reward.points_cost} className="w-full text-left p-2 rounded-lg bg-surface2 border border-borderColor text-sm disabled:opacity-50">
-                      <span className="text-textPrimary font-semibold">{reward.name}</span><span className="text-textMuted"> — {reward.points_cost} pts · {reward.stock_qty} left</span>
+                      <span className="text-textPrimary font-semibold">{reward.name}</span><span className="text-textMuted"> · {reward.points_cost} pts · {reward.stock_qty} left</span>
                     </button>
                   ))}
                   {rewardError && <p className={rewardError.includes("redeemed") ? "text-success text-xs" : "text-danger text-xs"}>{rewardError}</p>}

@@ -20,6 +20,7 @@ import { getStoredStaff, logout, checkBackendReachable, linkM2pesaToSale } from 
 import { syncPendingSales } from "./lib/db/syncQueue";
 import { getById } from "./lib/db/indexedDb";
 import { retryPendingMpesaLinks } from "./lib/mpesaLinks";
+import { IconWifiOff } from "@tabler/icons-react";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
 import { CartProvider } from "./contexts/CartContext";
 import { LocationProvider } from "./contexts/LocationContext";
@@ -162,9 +163,10 @@ export default function App() {
       <LocationProvider staff={staff}>
         <div style={{ minHeight: "100vh", background: "var(--surface-1)" }}>
         {!isOnline && (
-          <div className="w-full p-3 bg-warning/15 border-b border-warning/30 text-center">
-            <p className="text-warning text-sm font-semibold">
-              ⚠ Internet connection required. Some features may be unavailable.
+          <div className="w-full p-3 bg-warning/15 border-b border-warning/30 text-center" role="status">
+            <p className="text-warning text-sm font-semibold inline-flex items-center justify-center gap-2">
+              <IconWifiOff size={16} stroke={2} aria-hidden="true" />
+              You're offline. Cash sales still work and will sync when the connection is back; M-Pesa and admin pages need internet.
             </p>
           </div>
         )}

@@ -1,10 +1,11 @@
 import { memo } from "react";
+import { IconBottle, IconBuildingStore, IconFlame, IconMilk } from "@tabler/icons-react";
 
 const CATEGORY_META = {
-  butchery: { icon: "", label: "Retail" },
-  gas: { icon: "🔥", label: "Gas" },
-  drinks: { icon: "🥤", label: "Drinks" },
-  dairy: { icon: "🥛", label: "Dairy" },
+  butchery: { Icon: IconBuildingStore, label: "Retail" },
+  gas: { Icon: IconFlame, label: "Gas" },
+  drinks: { Icon: IconBottle, label: "Drinks" },
+  dairy: { Icon: IconMilk, label: "Dairy" },
 };
 
 function CategoryPills({ categories, active, onSelect, labels = {} }) {
@@ -14,9 +15,10 @@ function CategoryPills({ categories, active, onSelect, labels = {} }) {
       role="tablist"
       aria-label="Product categories">
       {categories.map((type) => {
-        const meta = CATEGORY_META[type] || { icon: "", label: type };
+        const meta = CATEGORY_META[type] || { Icon: null, label: type };
         const label = labels[type] || meta.label;
         const isActive = type === active;
+        const { Icon } = meta;
         return (
           <button
             key={type}
@@ -28,7 +30,7 @@ function CategoryPills({ categories, active, onSelect, labels = {} }) {
                 ? "text-primary border-primary"
                 : "text-textSecondary border-transparent hover:text-textPrimary"
             }`}>
-            <span aria-hidden="true">{meta.icon}</span>
+            {Icon && <Icon size={16} stroke={1.75} aria-hidden="true" />}
             <span className="capitalize">{label}</span>
           </button>
         );

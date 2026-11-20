@@ -16,8 +16,8 @@ export default function PayoutActionModal({ payout, onClose, onIssue, onUnfulfil
 
   const title =
     payout.type === "cashback"
-      ? `Cashback payout — KES ${Number(payout.cashback_amount || 0).toFixed(2)}`
-      : `Reward payout — ${payout.reward_name || "a reward"}`;
+      ? `Cashback payout: KES ${Number(payout.cashback_amount || 0).toFixed(2)}`
+      : `Reward payout: ${payout.reward_name || "a reward"}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

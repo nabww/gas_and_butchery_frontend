@@ -16,6 +16,7 @@ import {
   getStoredStaff,
 } from "../lib/api";
 import { CTabs, CTabList, CTab } from "@coreui/react";
+import ConfirmDialog from "../components/ConfirmDialog";
 import "@coreui/coreui/dist/css/coreui.min.css";
 
 const formatKes = (amount) =>
@@ -176,7 +177,7 @@ function BusinessConfigSection({ message, setMessage }) {
           </label>
         </div>
         <p className="text-textMuted text-xs mt-2">
-          PNG, JPG, GIF, SVG, or WebP, max 2 MB — or paste an image URL below.
+          PNG, JPG, GIF, SVG, or WebP, max 2 MB. Or paste an image URL below.
         </p>
         <input
           className={input}
@@ -757,9 +758,15 @@ function ShopsSettingsSection({ setMessage }) {
     }
   };
 
-  const clearMpesaConfig = async () => {
+  const [confirmMpesaReset, setConfirmMpesaReset] = useState(false);
+
+  const clearMpesaConfig = () => {
     if (!isAdmin || !selectedMpesaLocationId) return;
-    if (!confirm("Remove this shop's dedicated M-Pesa config and fall back to global .env settings?")) return;
+    setConfirmMpesaReset(true);
+  };
+
+  const performMpesaReset = async () => {
+    setConfirmMpesaReset(false);
     setMpesaLoading(true);
     setMessage("");
     try {
@@ -1061,7 +1068,7 @@ function ShopsSettingsSection({ setMessage }) {
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Party B (optional — defaults to shortcode)</label>
+                  <label className={label}>Party B / till number (optional, defaults to the shortcode)</label>
                   <input
                     className={input}
                     value={mpesaForm.partyB}
@@ -1084,6 +1091,15 @@ function ShopsSettingsSection({ setMessage }) {
                       className="px-4 py-2 rounded-lg border border-borderColor bg-surface2 text-danger text-sm font-semibold">
                       Reset to global
                     </button>
+                    <ConfirmDialog
+                      open={confirmMpesaReset}
+                      title="Reset this shop's M-Pesa settings?"
+                      message="This shop's own M-Pesa settings will be deleted and it will use the server's global settings instead."
+                      confirmLabel="Reset to global"
+                      danger
+                      onConfirm={performMpesaReset}
+                      onCancel={() => setConfirmMpesaReset(false)}
+                    />
                     <button
                       type="button"
                       onClick={closeMpesaConfig}

@@ -259,7 +259,7 @@ function StaffForm({ locations, editing, onSaved, onCancel }) {
           )}
           <label
             className="flex items-center gap-2 text-xs text-textSecondary"
-            title={!phone.trim() ? "Set a phone number — alerts send by SMS" : undefined}>
+            title={!phone.trim() ? "Set a phone number first. Alerts are sent by SMS" : undefined}>
             <input
               type="checkbox"
               checked={receiveStockAlerts}

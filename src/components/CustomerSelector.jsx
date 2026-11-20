@@ -6,6 +6,7 @@ import {
 } from "../lib/cache/customerCache";
 import { setSaleCustomer } from "../lib/saleOperations";
 import { useCart } from "../contexts/CartContext";
+import { IconSearch, IconX } from "@tabler/icons-react";
 
 const WALKIN_CUSTOMER = { id: null, name: "Walk-in Customer", phone: "" };
 
@@ -189,22 +190,30 @@ export default function CustomerSelector() {
       ) : null}
 
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">🔍</span>
+        <IconSearch
+          size={16}
+          stroke={2}
+          aria-hidden="true"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted pointer-events-none"
+        />
         <input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search customer..."
-          className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-surface1 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+          aria-label="Search customer"
+          className="w-full pl-9 pr-11 py-2.5 rounded-xl bg-surface1 border border-borderColor text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm"
         />
         {searchInput && (
           <button
+            type="button"
+            aria-label="Clear search"
             onClick={() => {
               setSearchInput("");
               setSearchResults([]);
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-textMuted hover:text-textPrimary rounded-full hover:bg-surface3 transition-colors text-xs">
-            ✕
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-textMuted hover:text-textPrimary rounded-full hover:bg-surface3 transition-colors">
+            <IconX size={16} stroke={2} aria-hidden="true" />
           </button>
         )}
       </div>
