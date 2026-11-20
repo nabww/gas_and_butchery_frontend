@@ -13,6 +13,7 @@ import { isOfflineSalesEnabled } from "../lib/settings";
 import { printReceipt } from "../lib/receipt";
 import { useCart } from "../contexts/CartContext";
 import { useActiveLocation } from "../contexts/LocationContext";
+import { addPendingMpesaLink, removePendingMpesaLink } from "../lib/mpesaLinks";
 import Checkmark from "./Checkmark";
 import PromoWinModal from "./PromoWinModal";
 
@@ -34,6 +35,7 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
     discountAmount,
     setPaymentMethod,
     resetCart,
+    setPaymentLocked,
   } = useCart();
   const [paymentPhone, setPaymentPhone] = useState(customer?.phone || "");
   const [phoneManuallyEdited, setPhoneManuallyEdited] = useState(false);
@@ -92,6 +94,12 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
   }, []);
 
 
+
+  useEffect(() => {
+    setPaymentLocked(!!mpesaTransaction);
+  }, [mpesaTransaction, setPaymentLocked]);
+
+  useEffect(() => () => setPaymentLocked(false), [setPaymentLocked]);
 
   useEffect(() => {
     if (!isOnline && paymentMethod === "mpesa") {
@@ -368,17 +376,51 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
       // — marks the sale completed (like cash), so the normal offline-sync
       // path picks it up and runs stock/loyalty/promo side effects exactly
       // once.
-      await recordMpesaSale(saleId, saleLocalId, total);
-
-      const syncResult = await syncPendingSales();
-      const realSaleId = syncResult?.saleServerIds?.[saleLocalId] || saleId;
-      if (typeof realSaleId !== "number") {
-        setError("Could not sync this sale to the server. Try again.");
-        setLoading(false);
+      const chargedAmount = Number(mpesaTransaction?.amount);
+      if (Number.isFinite(chargedAmount) && Math.abs(chargedAmount - Number(total)) >= 0.005) {
+        setError(
+          `The customer paid ${formatKes(chargedAmount)} but the sale total is now ${formatKes(total)}. ` +
+            "Do not resend. Ask a supervisor to reconcile this payment.",
+        );
         return;
       }
 
-      const { payer, pointsEarned, promoWins } = await linkM2pesaToSale(mpesaTransactionId, realSaleId);
+      await recordMpesaSale(saleId, saleLocalId, total);
+      addPendingMpesaLink({ mpesaTransactionId, saleLocalId });
+
+      const syncResult = await syncPendingSales().catch(() => null);
+      const realSaleId = syncResult?.saleServerIds?.[saleLocalId] || saleId;
+      if (typeof realSaleId !== "number") {
+        setMpesaTransaction(null);
+        setMpesaStatus(null);
+        setReceipt("Payment received. The sale is saved on this device and will sync automatically; the receipt will be in the Sales report.");
+        setShowReceipt(true);
+        scheduleReset();
+        return;
+      }
+
+      let linkResult;
+      try {
+        linkResult = await linkM2pesaToSale(mpesaTransactionId, realSaleId);
+        removePendingMpesaLink(mpesaTransactionId);
+      } catch (linkErr) {
+        // The customer has paid and the sale is synced -- never leave the
+        // till stuck or invite a second push. Transient failures stay queued
+        // for the background retry; a rejection needs a supervisor.
+        const rejected = [400, 404, 409].includes(linkErr.status);
+        if (rejected) removePendingMpesaLink(mpesaTransactionId);
+        setMpesaTransaction(null);
+        setMpesaStatus(null);
+        setReceipt(
+          rejected
+            ? `Payment received and sale saved, but the payment could not be matched to it: ${linkErr.message} Tell a supervisor.`
+            : "Payment received and sale saved. The payment will be matched to the sale automatically; the receipt is in the Sales report.",
+        );
+        setShowReceipt(true);
+        scheduleReset(rejected ? 8000 : 3000);
+        return;
+      }
+      const { payer, pointsEarned, promoWins } = linkResult;
       if (payer && payer.registered_via === "mpesa_auto" && !payer.consent_given_at) {
         onNewMpesaCustomer?.(payer);
       }
@@ -388,7 +430,9 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
         setPendingPromoWins(promoWins);
         setShowPromoModal(true);
       } else {
-        const receiptText = await getSaleReceipt(realSaleId);
+        const receiptText = await getSaleReceipt(realSaleId).catch(
+          () => "Sale completed and synced, but the receipt could not be loaded. Check the Sales report.",
+        );
         setMpesaSuccess(true);
         setReceipt(receiptText);
         setShowReceipt(true);

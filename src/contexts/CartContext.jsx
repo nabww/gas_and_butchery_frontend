@@ -14,6 +14,9 @@ export function CartProvider({ children }) {
   const [subtotal, setSubtotal] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [total, setTotal] = useState(0);
+  // True while an M-Pesa push is outstanding: the customer is being charged
+  // the total shown when it was sent, so the sale must not change under it.
+  const [paymentLocked, setPaymentLocked] = useState(false);
 
   // Recalculate totals whenever items or discount change.
   useEffect(() => {
@@ -88,6 +91,8 @@ export function CartProvider({ children }) {
         removeItem,
         applyDiscount,
         resetCart,
+        paymentLocked,
+        setPaymentLocked,
       }}>
       {children}
     </CartContext.Provider>

@@ -16,8 +16,10 @@ import Dashboard from "./pages/Dashboard";
 import Insights from "./pages/Insights";
 import BrandFooter from "./components/BrandFooter";
 
-import { getStoredStaff, logout, checkBackendReachable } from "./lib/api";
+import { getStoredStaff, logout, checkBackendReachable, linkM2pesaToSale } from "./lib/api";
 import { syncPendingSales } from "./lib/db/syncQueue";
+import { getById } from "./lib/db/indexedDb";
+import { retryPendingMpesaLinks } from "./lib/mpesaLinks";
 import { registerServiceWorker } from "./lib/registerServiceWorker";
 import { CartProvider } from "./contexts/CartContext";
 import { LocationProvider } from "./contexts/LocationContext";
@@ -75,6 +77,10 @@ export default function App() {
                 new CustomEvent("tezipos:sales-synced", { detail: result }),
               );
             }
+            return retryPendingMpesaLinks({
+              getSale: (localId) => getById("sales", localId),
+              link: linkM2pesaToSale,
+            });
           })
           .catch((err) => {
             console.warn("Background sync failed:", err.message);

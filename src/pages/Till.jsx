@@ -114,7 +114,12 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
     items,
     total,
     resetCart,
+    paymentLocked,
   } = useCart();
+  // `inert` blocks clicks and keyboard focus; React 18 needs the string form.
+  const lockedProps = paymentLocked
+    ? { inert: "", "aria-disabled": true, className: "till-lock-wrap till-locked" }
+    : { className: "till-lock-wrap" };
 
   // Keep the active catalog inside the allowed set if permissions change.
   useEffect(() => {
@@ -230,6 +235,7 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
                   type="button"
                   role="tab"
                   aria-selected={active}
+                  disabled={paymentLocked}
                   onClick={() => setBusinessType(type)}
                   className={active ? "active" : ""}>
                   <Icon size={16} stroke={1.75} aria-hidden="true" />
@@ -289,6 +295,12 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
           <div className={`till-content mobile-view-${mobileTab}`}>
             {/* Left pane: Product catalog */}
             <div className="left-pane">
+              {paymentLocked && (
+                <div className="till-lock-notice" role="status">
+                  M-Pesa payment in progress. The sale is locked until the payment completes or is cancelled.
+                </div>
+              )}
+              <div {...lockedProps}>
               <ProductCatalog
                 businessType={businessType}
                 allowedBusinesses={allowedBusinesses}
@@ -299,16 +311,19 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
                 businessLabels={businessLabels}
                 hideCategoryPills
               />
+              </div>
             </div>
 
             {/* Right pane: Cart, customer, payment */}
             <div className="right-pane">
-              <div className="right-section customer-section">
-                <CustomerSelector />
-              </div>
+              <div {...lockedProps}>
+                <div className="right-section customer-section">
+                  <CustomerSelector />
+                </div>
 
-              <div className="right-section cart-section">
-                <Cart canRedeemPoints={staff?.canRedeemPoints} />
+                <div className="right-section cart-section">
+                  <Cart canRedeemPoints={staff?.canRedeemPoints} />
+                </div>
               </div>
 
               {items.length > 0 && (
@@ -322,7 +337,7 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
                   </div>
 
                   <div className="till-actions">
-                    <button onClick={handleStartNewSale} className="btn-new-sale">
+                    <button onClick={handleStartNewSale} className="btn-new-sale" disabled={paymentLocked}>
                       New Sale
                     </button>
                   </div>
