@@ -20,17 +20,16 @@ export function LocationProvider({ children, staff }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!canSwitchLocation) {
+      const own = staff?.locationId ? String(staff.locationId) : "";
+      setActiveLocationId(own);
+      if (own) localStorage.setItem("activeLocationId", own);
+      else localStorage.removeItem("activeLocationId");
+    }
     listLocations()
       .then((data) => {
         if (!cancelled) {
           setLocations(data || []);
-          if (!canSwitchLocation && staff?.locationId) {
-            const own = String(staff.locationId);
-            if (activeLocationId !== own) {
-              setActiveLocationId(own);
-              localStorage.setItem("activeLocationId", own);
-            }
-          }
           // Staff who can switch locations are allowed to use an empty
           // activeLocationId as the "All locations" read-only view. Don't
           // overwrite it with a default shop on every reload.
@@ -62,7 +61,13 @@ export function LocationProvider({ children, staff }) {
   };
 
   return (
-    <LocationContext.Provider value={{ locations, activeLocationId, setActiveLocationId: setLocation }}>
+    <LocationContext.Provider value={{
+      locations,
+      activeLocationId: canSwitchLocation
+        ? activeLocationId
+        : staff?.locationId ? String(staff.locationId) : "",
+      setActiveLocationId: setLocation,
+    }}>
       {children}
     </LocationContext.Provider>
   );

@@ -40,16 +40,6 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
 
   const { activeLocationId, locations } = useActiveLocation();
 
-  if (!activeLocationId) {
-    return (
-      <main className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-textPrimary text-2xl font-bold">Till</h1>
-        <p className="text-textSecondary text-sm mt-2">
-          Select a specific shop above to make sales. The all-locations view is read-only.
-        </p>
-      </main>
-    );
-  }
   // A supervisor/admin who has switched shops via the nav sees that shop's
   // catalog and stock here too — useful for admins checking stock or
   // covering a rush at another branch. Cashiers (and anyone without switch
@@ -59,12 +49,12 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
     staff?.role === "admin" || (staff?.role === "supervisor" && staff?.canSwitchLocation);
   const catalogLocationId = canSwitchLocation ? activeLocationId : undefined;
   // Selling *as* another shop (the sale itself gets that shop's location_id)
-  // is admin-only -- the sync endpoint only lets an admin token upload a
-  // snapshot for a location other than their own (see sync.routes.js). A
-  // supervisor with can_switch_location can browse another shop's stock
-  // here but still rings up sales under their own home location.
+  // follows the same switch rights as browsing -- sync.routes.js accepts a
+  // snapshot for another location from admins and can_switch_location
+  // staff. Ringing a supervisor's sale under their home shop while the STK
+  // push used the browsed shop's till split money and stock across shops.
   const saleLocationOverride =
-    staff?.role === "admin" ? activeLocationId : undefined;
+    canSwitchLocation ? activeLocationId : undefined;
   // Silent misattribution risk: an admin's sales are tagged with whichever
   // shop the switcher is set to, which can be leftover from browsing a
   // different branch earlier. Surface it loudly so a sale never lands on
@@ -135,10 +125,10 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
 
   useEffect(() => {
     // Create a new sale when the till loads or the current sale is cleared.
-    if (!saleId && !isInitializing.current) {
+    if (activeLocationId && !saleId && !isInitializing.current) {
       initializeNewSale();
     }
-  }, [saleId]);
+  }, [saleId, activeLocationId]);
 
   const initializeNewSale = async () => {
     if (isInitializing.current) return;
@@ -212,6 +202,17 @@ export default function Till({ staff, onNavigate, isOnline = true }) {
     setPendingConsentCustomer(null);
     onNavigate?.("/customers");
   };
+
+  if (!activeLocationId) {
+    return (
+      <main className="p-6 max-w-4xl mx-auto">
+        <h1 className="text-textPrimary text-2xl font-bold">Till</h1>
+        <p className="text-textSecondary text-sm mt-2">
+          Select a specific shop above to make sales. The all-locations view is read-only.
+        </p>
+      </main>
+    );
+  }
 
   return (
     <div className="till-container">

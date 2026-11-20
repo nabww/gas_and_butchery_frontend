@@ -12,6 +12,7 @@ import { syncPendingSales, syncAuthorizedAccountSale, getPendingSaleSnapshot } f
 import { isOfflineSalesEnabled } from "../lib/settings";
 import { printReceipt } from "../lib/receipt";
 import { useCart } from "../contexts/CartContext";
+import { useActiveLocation } from "../contexts/LocationContext";
 import Checkmark from "./Checkmark";
 import PromoWinModal from "./PromoWinModal";
 
@@ -22,6 +23,7 @@ const formatKes = (amount) =>
   })}`;
 
 export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnline }) {
+  const { activeLocationId } = useActiveLocation();
   const {
     items,
     total,
@@ -223,7 +225,11 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
           setLoading(false);
           return;
         }
-        const transaction = await initiateM2pesa(paymentPhone, total);
+        const draft = await getPendingSaleSnapshot(saleLocalId);
+        if (!draft?.location_id || String(draft.location_id) !== String(activeLocationId)) {
+          throw new Error("The sale's shop does not match the selected shop. Reopen the till before sending payment.");
+        }
+        const transaction = await initiateM2pesa(paymentPhone, total, draft.location_id);
         setMpesaTransaction(transaction);
         setMpesaStatus("pending");
         setLoading(false);
@@ -348,9 +354,8 @@ export default function PaymentUI({ onSaleCompleted, onNewMpesaCustomer, isOnlin
         }
       } catch (err) {
         stopMpesaPolling();
-        setMpesaTransaction(null);
-        setMpesaStatus(null);
-        setError(err.message || "Failed to check M-Pesa payment status");
+        setMpesaStatus("timeout");
+        setError(err.message || "Unable to confirm payment status. Check again before sending another request.");
       }
     }, MPESA_POLL_INTERVAL_MS);
   };

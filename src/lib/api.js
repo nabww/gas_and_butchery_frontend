@@ -257,12 +257,13 @@ export async function getSaleReceipt(saleId) {
 
 // ========== PAYMENTS API ==========
 
-export async function initiateM2pesa(phone, amount) {
+export async function initiateM2pesa(phone, amount, locationId) {
   return apiFetch("/payments/mpesa/initiate", {
     method: "POST",
     body: JSON.stringify({
       phone,
       amount: parseFloat(amount),
+      location_id: locationId,
     }),
   });
 }
