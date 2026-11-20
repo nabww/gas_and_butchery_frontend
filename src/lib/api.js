@@ -27,15 +27,18 @@ export function resolveApiAssetUrl(url) {
   return url;
 }
 
-// Points the browser tab/PWA icon at the uploaded business logo so branding
-// follows whatever is configured in Settings. index.html ships a generic
-// icon-192.png fallback, which stays in place until a logo is assigned --
+// Points the browser tab icon at the uploaded business logo so branding
+// follows whatever is configured in Settings. index.html ships the Tezi
+// favicon as the fallback, which stays in place until a logo is assigned --
 // and returns if the logo is ever cleared. Called from every path that
 // receives a business config (sign-in, nav, settings) since they all run
 // through normalizeBusinessConfig below.
+// The apple-touch-icon is deliberately left alone: iOS uses it as the
+// home-screen icon, which must be the square Tezi icon -- swapping in a
+// wide/transparent uploaded logo got squashed or shown on black.
 function setFavicon(url) {
   if (typeof document === "undefined") return;
-  const href = url || "/icon-192.png";
+  const href = url || "/favicon-32.png";
   let icon = document.querySelector('link[rel="icon"]');
   if (!icon) {
     icon = document.createElement("link");
@@ -43,8 +46,6 @@ function setFavicon(url) {
     document.head.appendChild(icon);
   }
   icon.href = href;
-  const appleTouch = document.querySelector('link[rel="apple-touch-icon"]');
-  if (appleTouch && url) appleTouch.href = url;
 }
 
 function normalizeBusinessConfig(config) {

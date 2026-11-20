@@ -6,7 +6,9 @@
 // Bump this on any change to the caching strategy below -- the activate
 // handler purges any cache whose name doesn't match, which is what
 // clears out a stale shell after a deploy.
-const CACHE_NAME = 'tezipos-shell-v3';
+// v4: icons and the manifest have fixed filenames and are served
+// cache-first, so replacing them needs a purge or old devices keep the old icon.
+const CACHE_NAME = 'tezipos-shell-v4';
 
 self.addEventListener('install', (event) => {
   // Nothing to precache -- index.html and hashed assets are cached
